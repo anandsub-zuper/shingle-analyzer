@@ -8,7 +8,6 @@ const ShingleAnalyzer = () => {
   const [analyzing, setAnalyzing] = useState(false);
   const [results, setResults] = useState(null);
   const [error, setError] = useState(null);
-  const [apiKey, setApiKey] = useState('');
 
   const handleFileChange = (e) => {
     const selectedFile = e.target.files[0];
@@ -34,11 +33,6 @@ const ShingleAnalyzer = () => {
       return;
     }
 
-    if (!apiKey) {
-      setError("Please enter your OpenAI API key");
-      return;
-    }
-
     setAnalyzing(true);
     setError(null);
     
@@ -51,16 +45,15 @@ const ShingleAnalyzer = () => {
         const base64Image = reader.result.split(',')[1];
         
         try {
-          // Call your backend API instead of OpenAI directly
-          // Replace the URL with your actual backend server URL
-          const response = await fetch('https://shingle-analyzer-cf8f8df19174.herokuapp.com/api/analyze-shingle', {
+          // Call your backend API - replace with your actual Heroku URL
+          const response = await fetch('https://your-heroku-app-name.herokuapp.com/api/analyze-shingle', {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
             },
             body: JSON.stringify({
-              image: base64Image,
-              apiKey: apiKey
+              image: base64Image
+              // No API key needed - it's stored on the backend
             })
           });
           
@@ -138,20 +131,6 @@ const ShingleAnalyzer = () => {
       <h1 className="analyzer-title">Roofing Shingle Analyzer</h1>
       
       <div className="form-group">
-        <label className="input-label">OpenAI API Key</label>
-        <input
-          type="password"
-          value={apiKey}
-          onChange={(e) => setApiKey(e.target.value)}
-          placeholder="Enter your OpenAI API key"
-          className="text-input"
-        />
-        <p className="input-help-text">
-          Your API key is required to use the OpenAI Vision API for analysis
-        </p>
-      </div>
-      
-      <div className="form-group">
         <label className="input-label">Upload Shingle Image</label>
         <input
           type="file"
@@ -179,8 +158,8 @@ const ShingleAnalyzer = () => {
       
       <button
         onClick={analyzeImage}
-        disabled={!file || analyzing || !apiKey}
-        className={`analyze-button ${(!file || analyzing || !apiKey) ? 'button-disabled' : ''}`}
+        disabled={!file || analyzing}
+        className={`analyze-button ${(!file || analyzing) ? 'button-disabled' : ''}`}
       >
         {analyzing ? 'Analyzing...' : 'Analyze Shingle'}
       </button>
