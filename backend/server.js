@@ -17,14 +17,6 @@ app.use(cors({
 // Add preflight handling for all routes
 app.options('*', cors());
 
-// Add additional headers to ensure CORS works
-app.use((req, res, next) => {
-  res.header('Access-Control-Allow-Origin', 'https://roof-shingle-analyzer.netlify.app');
-  res.header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
-  next();
-});
-
 // Middleware for parsing JSON (with higher limit for large images)
 app.use(express.json({ limit: '50mb' }));
 
@@ -69,8 +61,9 @@ app.post('/api/analyze-shingle', async (req, res) => {
     console.log("Preparing OpenAI API request");
     
     // Create the OpenAI API request payload
+    // Updated to use gpt-4o model which has vision capabilities
     const payload = {
-      model: "gpt-4-vision-preview",
+      model: "gpt-4o",
       messages: [
         {
           role: "system",
