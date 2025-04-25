@@ -46,7 +46,7 @@ const ShingleAnalyzer = () => {
         
         try {
           // Call your backend API - replace with your actual Heroku URL
-          const response = await fetch('https://your-heroku-app-name.herokuapp.com/api/analyze-shingle', {
+          const response = await fetch('https://shingle-analyzer-cf8f8df19174.herokuapp.com/api/analyze-shingle', {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
