@@ -53,7 +53,7 @@ const ShingleAnalyzer = () => {
         try {
           // Call your backend API instead of OpenAI directly
           // Replace the URL with your actual backend server URL
-          const response = await fetch('https://your-backend-server.com/api/analyze-shingle', {
+          const response = await fetch('https://shingle-analyzer-cf8f8df19174.herokuapp.com/api/analyze-shingle', {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
