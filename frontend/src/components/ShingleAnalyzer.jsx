@@ -53,58 +53,128 @@ const ShingleAnalyzer = () => {
             },
             body: JSON.stringify({
               image: base64Image
-              // No API key needed - it's stored on the backend
             })
           });
           
           const data = await response.json();
+          
+          // Add debugging logs
+          console.log("Raw response from API:", data);
+          
           if (response.ok) {
-            const gptResponse = data.choices[0].message.content;
-            let parsedResponse;
-            
-            try {
-              // Try to parse the response as JSON
-              parsedResponse = JSON.parse(gptResponse);
+            if (data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content) {
+              const gptResponse = data.choices[0].message.content;
+              console.log("Content from API:", gptResponse);
               
-              // If any essential fields are missing, add placeholder values
-              const requiredFields = ['name', 'manufacturer', 'productLine', 'material', 'weight', 
-                                     'dimensions', 'thickness', 'lifespan', 'pattern', 'warranty'];
-              
-              requiredFields.forEach(field => {
-                if (!parsedResponse[field]) {
-                  parsedResponse[field] = 'Unknown';
+              try {
+                // Try to parse the response as JSON
+                let parsedResponse;
+                
+                // Handle content that might be a string representation of JSON
+                if (typeof gptResponse === 'string') {
+                  // Try to extract JSON if it's within the string
+                  const jsonMatch = gptResponse.match(/\{.*\}/s);
+                  if (jsonMatch) {
+                    try {
+                      parsedResponse = JSON.parse(jsonMatch[0]);
+                      console.log("Extracted and parsed JSON from string:", parsedResponse);
+                    } catch (e) {
+                      console.error("Failed to parse extracted JSON:", e);
+                      parsedResponse = null;
+                    }
+                  }
+                  
+                  // If extraction failed or no match, try parsing the whole string
+                  if (!parsedResponse) {
+                    try {
+                      parsedResponse = JSON.parse(gptResponse);
+                      console.log("Parsed entire content as JSON:", parsedResponse);
+                    } catch (e) {
+                      console.error("Failed to parse entire content as JSON:", e);
+                      // Continue to fallback handling
+                    }
+                  }
+                } else if (typeof gptResponse === 'object') {
+                  // If it's already an object, use it directly
+                  parsedResponse = gptResponse;
+                  console.log("Content was already an object:", parsedResponse);
                 }
-              });
-              
-              setResults({
-                specifications: parsedResponse,
-                rawResponse: gptResponse
-              });
-            } catch (e) {
-              console.error("Failed to parse GPT response as JSON:", e);
-              
-              // Extract useful info from text response by creating a simplified JSON
-              const simplifiedResponse = {
-                name: "Detected Shingle",
-                manufacturer: "Unknown Manufacturer",
-                productLine: "Unknown",
-                material: "Unknown Material",
-                weight: "Unknown",
-                dimensions: "Unknown",
-                thickness: "Unknown",
-                lifespan: "Unknown",
-                pattern: "Unknown",
-                warranty: "Unknown",
-                details: gptResponse
-              };
-              
-              setResults({
-                specifications: simplifiedResponse,
-                rawResponse: gptResponse
-              });
+                
+                // If parsing was successful
+                if (parsedResponse) {
+                  // If any essential fields are missing, add placeholder values
+                  const requiredFields = ['name', 'manufacturer', 'productLine', 'material', 'weight', 
+                                        'dimensions', 'thickness', 'lifespan', 'pattern', 'warranty'];
+                  
+                  requiredFields.forEach(field => {
+                    if (!parsedResponse[field]) {
+                      parsedResponse[field] = 'Unknown';
+                    }
+                  });
+                  
+                  setResults({
+                    specifications: parsedResponse,
+                    rawResponse: typeof gptResponse === 'string' ? gptResponse : JSON.stringify(gptResponse, null, 2)
+                  });
+                } else {
+                  throw new Error("Could not parse response as JSON");
+                }
+              } catch (e) {
+                console.error("Failed to process GPT response:", e);
+                
+                // Extract useful info from text response by creating a simplified JSON
+                // Try to extract useful information from the text response
+                let name = "Detected Shingle";
+                let manufacturer = "Unknown Manufacturer";
+                
+                if (typeof gptResponse === 'string') {
+                  // Try to extract basic info from the text
+                  if (gptResponse.includes("asphalt")) {
+                    name = "Asphalt Shingle";
+                  } else if (gptResponse.includes("wood") || gptResponse.includes("cedar")) {
+                    name = "Wood Shingle";
+                  } else if (gptResponse.includes("slate")) {
+                    name = "Slate Shingle";
+                  } else if (gptResponse.includes("metal")) {
+                    name = "Metal Roofing";
+                  }
+                  
+                  // Try to extract manufacturer if mentioned
+                  const commonManufacturers = ["GAF", "Owens Corning", "CertainTeed", "Malarkey", "IKO", "TAMKO", "Atlas"];
+                  for (const mfr of commonManufacturers) {
+                    if (gptResponse.includes(mfr)) {
+                      manufacturer = mfr;
+                      break;
+                    }
+                  }
+                }
+                
+                const simplifiedResponse = {
+                  name: name,
+                  manufacturer: manufacturer,
+                  productLine: "Unknown",
+                  material: "Unknown Material",
+                  weight: "Unknown",
+                  dimensions: "Unknown",
+                  thickness: "Unknown",
+                  lifespan: "Unknown",
+                  pattern: "Unknown",
+                  warranty: "Unknown",
+                  details: typeof gptResponse === 'string' ? gptResponse : "No text response available"
+                };
+                
+                setResults({
+                  specifications: simplifiedResponse,
+                  rawResponse: typeof gptResponse === 'string' ? gptResponse : JSON.stringify(gptResponse, null, 2)
+                });
+              }
+            } else {
+              console.error("Unexpected API response structure:", data);
+              throw new Error("Unexpected API response structure");
             }
           } else {
-            throw new Error(`API error: ${data.error?.message || 'Unknown error'}`);
+            console.error("API error response:", data);
+            throw new Error(`API error: ${data.error?.message || data.error || 'Unknown error'}`);
           }
           setAnalyzing(false);
         } catch (error) {
