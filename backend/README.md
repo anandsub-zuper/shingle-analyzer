@@ -9,6 +9,8 @@ This is the backend server for the Shingle Analyzer application. It provides an 
 3. Install dependencies:
 
 npm install
+
+
 4. Create a .env file based on .env.example and add your OpenAI API key
 5. Start the server:
 
