@@ -11,7 +11,16 @@ const ShingleAnalyzer = () => {
 
   const handleFileChange = (e) => {
     const selectedFile = e.target.files[0];
+    
     if (selectedFile) {
+      // Check if file type is supported
+      const supportedTypes = ['image/png', 'image/jpeg', 'image/jpg', 'image/gif', 'image/webp'];
+      
+      if (!supportedTypes.includes(selectedFile.type)) {
+        setError("Unsupported file format. Please upload PNG, JPEG, GIF, or WEBP images only.");
+        return;
+      }
+      
       setFile(selectedFile);
       
       // Create a preview of the uploaded image
@@ -43,6 +52,10 @@ const ShingleAnalyzer = () => {
       
       reader.onload = async () => {
         const base64Image = reader.result.split(',')[1];
+        
+        // For debugging
+        console.log("File type:", file.type);
+        console.log("Base64 data length:", base64Image.length);
         
         try {
           // Call your backend API - replace with your actual Heroku URL
@@ -204,12 +217,12 @@ const ShingleAnalyzer = () => {
         <label className="input-label">Upload Shingle Image</label>
         <input
           type="file"
-          accept="image/*"
+          accept="image/png, image/jpeg, image/jpg, image/gif, image/webp"
           onChange={handleFileChange}
           className="file-input"
         />
         <p className="input-help-text">
-          Upload a clear image of the roofing shingle for best results
+          Upload a clear image of the roofing shingle for best results. Supported formats: PNG, JPEG, GIF, WEBP.
         </p>
       </div>
       
