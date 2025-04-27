@@ -460,42 +460,105 @@ body {
   margin-bottom: 1.5rem;
 }
 
+/* Improved styling for Cost Breakdown Table */
 .breakdown-table {
   width: 100%;
-  border-collapse: collapse;
+  border-collapse: separate;
+  border-spacing: 0;
   font-size: 0.875rem;
-  margin-top: 0.75rem;
+  margin: 1.5rem 0;
+  border: 1px solid var(--gray-200);
+  border-radius: var(--border-radius);
+  overflow: hidden;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
 }
 
 .breakdown-table th {
   text-align: left;
-  padding: 0.75rem;
+  padding: 1rem;
   background-color: var(--gray-100);
-  color: var(--gray-700);
+  color: var(--gray-800);
   font-weight: 600;
+  border-bottom: 2px solid var(--gray-300);
+}
+
+.breakdown-table th:first-child {
+  width: 60%;
+}
+
+.breakdown-table th:last-child {
+  width: 40%;
+  text-align: right;
 }
 
 .breakdown-table td {
-  padding: 0.75rem;
+  padding: 1rem;
   border-bottom: 1px solid var(--gray-200);
+  vertical-align: middle;
+}
+
+.breakdown-table td:last-child {
+  text-align: right;
+  font-weight: 500;
+  color: var(--gray-800);
 }
 
 .breakdown-table tr:last-child td {
   border-bottom: none;
 }
 
-.repair-vs-replace {
-  margin-top: 1.5rem;
-  padding: 1rem;
-  background-color: rgba(255, 209, 102, 0.2);
-  border-left: 4px solid var(--warning);
-  border-radius: 4px;
+.breakdown-table tr:nth-child(even) {
+  background-color: rgba(0, 0, 0, 0.02);
 }
 
-.replace-note {
+.breakdown-table tr:hover {
+  background-color: rgba(67, 97, 238, 0.05);
+}
+
+/* Better separation between sections */
+.cost-breakdown {
+  margin-bottom: 2rem;
+}
+
+.cost-breakdown h4 {
+  font-size: 1rem;
+  font-weight: 600;
+  margin-bottom: 0.75rem;
   color: var(--gray-800);
-  font-size: 0.875rem;
-  margin: 0;
+}
+
+.repair-recommendations {
+  margin-top: 2rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid var(--gray-200);
+}
+
+.repair-recommendations h4 {
+  font-size: 1rem;
+  font-weight: 600;
+  margin-bottom: 1rem;
+  color: var(--gray-800);
+  display: flex;
+  align-items: center;
+}
+
+.repair-recommendations h4::before {
+  content: "🔧";
+  margin-right: 0.5rem;
+  font-size: 1.125rem;
+}
+
+.repair-recommendations p {
+  margin-bottom: 1rem;
+  line-height: 1.6;
+}
+
+/* Total cost row styling */
+.total-cost-row td {
+  font-weight: 700;
+  color: var(--primary);
+  border-top: 2px solid var(--gray-300);
+  background-color: rgba(67, 97, 238, 0.05);
 }
 
 /* Raw Response */
@@ -594,6 +657,17 @@ body {
 
   .damage-item {
     width: 100%;
+  }
+  
+  .breakdown-table th,
+  .breakdown-table td {
+    padding: 0.75rem;
+    font-size: 0.813rem;
+  }
+  
+  .breakdown-table th:first-child,
+  .breakdown-table th:last-child {
+    width: auto;
   }
 }
 
