@@ -11,7 +11,6 @@ const CostEstimation = ({ damageData }) => {
       'missing shingles': { min: 150, max: 550, unit: 'per area' },
       'damaged shingles': { min: 360, max: 1830, unit: 'total' },
       'curling shingles': { min: 350, max: 800, unit: 'total' },
-      'granule loss': { min: 400, max: 1200, unit: 'total' },
       'cracked shingles': { min: 350, max: 1000, unit: 'total' },
       'lifted shingles': { min: 300, max: 800, unit: 'total' },
       'water damage': { min: 800, max: 2500, unit: 'total' },
@@ -28,7 +27,10 @@ const CostEstimation = ({ damageData }) => {
       'storm damage': { min: 700, max: 3000, unit: 'total' },
       'wind damage': { min: 500, max: 2000, unit: 'total' },
       'ridge cap damage': { min: 250, max: 750, unit: 'total' },
-      'ventilation issues': { min: 300, max: 1000, unit: 'total' }
+      'ventilation issues': { min: 300, max: 1000, unit: 'total' },
+      'granule loss': { min: 400, max: 1200, unit: 'total' },
+      'cracking': { min: 350, max: 1000, unit: 'total' },
+      'curling': { min: 350, max: 800, unit: 'total' }
     };
 
     // Calculate minimum and maximum estimates based on damage types
@@ -163,6 +165,12 @@ const CostEstimation = ({ damageData }) => {
                   <td>{formatCurrency(detail.min)} - {formatCurrency(detail.max)}</td>
                 </tr>
               ))}
+              {costEstimate.details.length > 1 && (
+                <tr className="total-cost-row">
+                  <td>Total (with 15% overlap discount)</td>
+                  <td>{formatCurrency(costEstimate.min)} - {formatCurrency(costEstimate.max)}</td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>
