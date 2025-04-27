@@ -20,6 +20,24 @@ app.options('*', cors());
 // Middleware for parsing JSON (with higher limit for large images)
 app.use(express.json({ limit: '50mb' }));
 
+// Function to validate image format
+function validateImageFormat(base64Image) {
+  // Check if the base64 string starts with the expected formats
+  const pngHeader = "iVBORw0KGgo";         // PNG format header
+  const jpegHeader = "/9j/";               // JPEG format header
+  const gifHeader = "R0lGOD";              // GIF format header
+  const webpHeader = "UklGR";              // WEBP format header
+  
+  if (base64Image.startsWith(pngHeader) ||
+      base64Image.startsWith(jpegHeader) ||
+      base64Image.startsWith(gifHeader) ||
+      base64Image.startsWith(webpHeader)) {
+    return true;
+  }
+  
+  return false;
+}
+
 // API status endpoint to check if API key is configured
 app.get('/api-status', (req, res) => {
   const apiKey = process.env.OPENAI_API_KEY;
@@ -51,6 +69,14 @@ app.post('/api/analyze-shingle', async (req, res) => {
       return res.status(400).json({ error: "No image data provided" });
     }
     
+    // Validate image format
+    if (!validateImageFormat(image)) {
+      console.log("Invalid image format");
+      return res.status(400).json({ 
+        error: "Invalid image format. Please upload PNG, JPEG, GIF, or WEBP images."
+      });
+    }
+    
     // Validate API key
     const apiKey = process.env.OPENAI_API_KEY;
     if (!apiKey) {
@@ -61,20 +87,19 @@ app.post('/api/analyze-shingle', async (req, res) => {
     console.log("Preparing OpenAI API request");
     
     // Create the OpenAI API request payload
-    // Updated to use gpt-4o model which has vision capabilities
     const payload = {
       model: "gpt-4o",
       messages: [
         {
           role: "system",
-          content: "You are an expert in roofing shingles. Analyze the uploaded image and identify the type of shingle, manufacturer if possible, and all specifications you can determine. Format your response as a JSON object with these fields: name, manufacturer, productLine, material, weight, dimensions, thickness, lifespan, pattern, warranty, and any other relevant specifications you can determine. If you're not certain about any field, make your best estimate and indicate uncertainty with '(estimated)' after the value."
+          content: "You are an expert in roofing shingles. Analyze the uploaded image and identify the type of shingle, manufacturer if possible, and all specifications you can determine. ALSO, carefully analyze for any visible damage or wear such as: missing granules, cracks, curling edges, blistering, algae growth, or impact damage from hail. Format your response as a JSON object with these fields: name, manufacturer, productLine, material, weight, dimensions, thickness, lifespan, pattern, warranty, and damageAssessment. In the damageAssessment field, include a nested object with: overallCondition (Excellent, Good, Fair, Poor), damageTypes (array of damage types found), severity (1-10 scale), description (detailed description of damage), and recommendedAction (what should be done about the damage)."
         },
         {
           role: "user",
           content: [
             {
               type: "text",
-              text: "Please analyze this roofing shingle image and provide detailed specifications in JSON format."
+              text: "Please analyze this roofing shingle image and provide detailed specifications along with any signs of damage or wear in JSON format."
             },
             {
               type: "image_url",
@@ -86,7 +111,7 @@ app.post('/api/analyze-shingle', async (req, res) => {
           ]
         }
       ],
-      max_tokens: 1000
+      max_tokens: 1500
     };
     
     // Call the OpenAI API
