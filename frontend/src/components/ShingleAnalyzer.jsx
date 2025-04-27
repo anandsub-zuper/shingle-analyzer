@@ -55,10 +55,6 @@ const ShingleAnalyzer = () => {
       reader.onload = async () => {
         const base64Image = reader.result.split(',')[1];
         
-        // For debugging
-        console.log("File type:", file.type);
-        console.log("Base64 data length:", base64Image.length);
-        
         try {
           // Call your backend API - replace with your actual Heroku URL
           const response = await fetch('https://shingle-analyzer-cf8f8df19174.herokuapp.com/api/analyze-shingle', {
@@ -73,13 +69,9 @@ const ShingleAnalyzer = () => {
           
           const data = await response.json();
           
-          // Add debugging logs
-          console.log("Raw response from API:", data);
-          
           if (response.ok) {
             if (data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content) {
               const gptResponse = data.choices[0].message.content;
-              console.log("Content from API:", gptResponse);
               
               try {
                 // Try to parse the response as JSON
@@ -92,9 +84,7 @@ const ShingleAnalyzer = () => {
                   if (jsonMatch) {
                     try {
                       parsedResponse = JSON.parse(jsonMatch[0]);
-                      console.log("Extracted and parsed JSON from string:", parsedResponse);
                     } catch (e) {
-                      console.error("Failed to parse extracted JSON:", e);
                       parsedResponse = null;
                     }
                   }
@@ -103,16 +93,13 @@ const ShingleAnalyzer = () => {
                   if (!parsedResponse) {
                     try {
                       parsedResponse = JSON.parse(gptResponse);
-                      console.log("Parsed entire content as JSON:", parsedResponse);
                     } catch (e) {
-                      console.error("Failed to parse entire content as JSON:", e);
                       // Continue to fallback handling
                     }
                   }
                 } else if (typeof gptResponse === 'object') {
                   // If it's already an object, use it directly
                   parsedResponse = gptResponse;
-                  console.log("Content was already an object:", parsedResponse);
                 }
                 
                 // If parsing was successful
@@ -146,10 +133,7 @@ const ShingleAnalyzer = () => {
                   throw new Error("Could not parse response as JSON");
                 }
               } catch (e) {
-                console.error("Failed to process GPT response:", e);
-                
                 // Extract useful info from text response by creating a simplified JSON
-                // Try to extract useful information from the text response
                 let name = "Detected Shingle";
                 let manufacturer = "Unknown Manufacturer";
                 
@@ -202,28 +186,23 @@ const ShingleAnalyzer = () => {
                 });
               }
             } else {
-              console.error("Unexpected API response structure:", data);
               throw new Error("Unexpected API response structure");
             }
           } else {
-            console.error("API error response:", data);
             throw new Error(`API error: ${data.error?.message || data.error || 'Unknown error'}`);
           }
           setAnalyzing(false);
         } catch (error) {
-          console.error("API call error:", error);
           setError("Error calling API: " + error.message);
           setAnalyzing(false);
         }
       };
       
       reader.onerror = (error) => {
-        console.error("File reading error:", error);
         setError("Error reading file: " + error.message);
         setAnalyzing(false);
       };
     } catch (err) {
-      console.error("Overall error:", err);
       setError("Error analyzing image: " + err.message);
       setAnalyzing(false);
     }
@@ -233,42 +212,60 @@ const ShingleAnalyzer = () => {
     <div className="shingle-analyzer-container">
       <h1 className="analyzer-title">Roofing Shingle Analyzer</h1>
       
-      <div className="form-group">
-        <label className="input-label">Upload Shingle Image</label>
-        <input
-          type="file"
-          accept="image/png, image/jpeg, image/jpg, image/gif, image/webp"
-          onChange={handleFileChange}
-          className="file-input"
-        />
-        <p className="input-help-text">
-          Upload a clear image of the roofing shingle for best results. Supported formats: PNG, JPEG, GIF, WEBP.
-        </p>
-      </div>
-      
-      {preview && (
-        <div className="preview-container">
-          <h2 className="section-title">Preview</h2>
-          <div className="image-preview">
-            <img 
-              src={preview} 
-              alt="Shingle preview" 
-              className="preview-image"
+      <div className="upload-section">
+        <div className="form-group">
+          <label className="input-label">Upload Shingle Image</label>
+          <div className="file-input-wrapper">
+            <div className="file-input-icon upload-icon"></div>
+            <div className="file-input-text">Drag & drop your image here or click to browse</div>
+            <div className="file-input-description">Supported formats: PNG, JPEG, GIF, WEBP</div>
+            <input
+              type="file"
+              accept="image/png, image/jpeg, image/jpg, image/gif, image/webp"
+              onChange={handleFileChange}
+              className="file-input"
             />
           </div>
+          <p className="input-help-text">
+            Upload a clear image of the roofing shingle for best results
+          </p>
         </div>
-      )}
-      
-      <button
-        onClick={analyzeImage}
-        disabled={!file || analyzing}
-        className={`analyze-button ${(!file || analyzing) ? 'button-disabled' : ''}`}
-      >
-        {analyzing ? 'Analyzing...' : 'Analyze Shingle'}
-      </button>
+        
+        {preview && (
+          <div className="preview-container">
+            <h2 className="section-title">Preview</h2>
+            <div className="image-preview">
+              <img 
+                src={preview} 
+                alt="Shingle preview" 
+                className="preview-image"
+              />
+            </div>
+          </div>
+        )}
+        
+        <button
+          onClick={analyzeImage}
+          disabled={!file || analyzing}
+          className={`analyze-button ${(!file || analyzing) ? 'button-disabled' : ''}`}
+        >
+          {analyzing ? (
+            <>
+              <span className="loading-spinner"></span>
+              Analyzing...
+            </>
+          ) : (
+            <>
+              <span className="analyze-icon"></span>
+              Analyze Shingle
+            </>
+          )}
+        </button>
+      </div>
       
       {error && (
         <div className="error-message">
+          <span className="error-icon"></span>
           {error}
         </div>
       )}
@@ -279,51 +276,55 @@ const ShingleAnalyzer = () => {
             <div className="results-title">
               <h2 className="shingle-name">{results.specifications.name}</h2>
               <p className="analysis-completed">
+                <span className="checkmark-icon check-icon"></span>
                 Analysis Complete
               </p>
             </div>
             <div className="analysis-method">
-              <p className="method-label">Analysis Method</p>
+              <p className="method-label">Powered by</p>
               <p className="method-value">OpenAI Vision API</p>
             </div>
           </div>
           
-          <div className="specifications-grid">
-            <div className="spec-item">
-              <span className="spec-label">Manufacturer</span>
-              <span className="spec-value">{results.specifications.manufacturer}</span>
-            </div>
-            <div className="spec-item">
-              <span className="spec-label">Product Line</span>
-              <span className="spec-value">{results.specifications.productLine}</span>
-            </div>
-            <div className="spec-item">
-              <span className="spec-label">Material</span>
-              <span className="spec-value">{results.specifications.material}</span>
-            </div>
-            <div className="spec-item">
-              <span className="spec-label">Weight</span>
-              <span className="spec-value">{results.specifications.weight}</span>
-            </div>
-            <div className="spec-item">
-              <span className="spec-label">Dimensions</span>
-              <span className="spec-value">{results.specifications.dimensions}</span>
-            </div>
-            <div className="spec-item">
-              <span className="spec-label">Thickness</span>
-              <span className="spec-value">{results.specifications.thickness}</span>
-            </div>
-            <div className="spec-item">
-              <span className="spec-label">Expected Lifespan</span>
-              <span className="spec-value">{results.specifications.lifespan}</span>
-            </div>
-            <div className="spec-item">
-              <span className="spec-label">Pattern Type</span>
-              <span className="spec-value">{results.specifications.pattern}</span>
-            </div>
-            <div className="spec-item">
-              <span className="spec-label">Warranty</span>
-              <span className="spec-value">{results.specifications.warranty}</span>
+          <div className="specs-section">
+            <h3 className="section-subtitle">Specifications</h3>
+            <div className="specifications-grid">
+              <div className="spec-item">
+                <span className="spec-label">Manufacturer</span>
+                <span className="spec-value">{results.specifications.manufacturer}</span>
+              </div>
+              <div className="spec-item">
+                <span className="spec-label">Product Line</span>
+                <span className="spec-value">{results.specifications.productLine}</span>
+              </div>
+              <div className="spec-item">
+                <span className="spec-label">Material</span>
+                <span className="spec-value">{results.specifications.material}</span>
+              </div>
+              <div className="spec-item">
+                <span className="spec-label">Weight</span>
+                <span className="spec-value">{results.specifications.weight}</span>
+              </div>
+              <div className="spec-item">
+                <span className="spec-label">Dimensions</span>
+                <span className="spec-value">{results.specifications.dimensions}</span>
+              </div>
+              <div className="spec-item">
+                <span className="spec-label">Thickness</span>
+                <span className="spec-value">{results.specifications.thickness}</span>
+              </div>
+              <div className="spec-item">
+                <span className="spec-label">Expected Lifespan</span>
+                <span className="spec-value">{results.specifications.lifespan}</span>
+              </div>
+              <div className="spec-item">
+                <span className="spec-label">Pattern Type</span>
+                <span className="spec-value">{results.specifications.pattern}</span>
+              </div>
+              <div className="spec-item">
+                <span className="spec-label">Warranty</span>
+                <span className="spec-value">{results.specifications.warranty}</span>
+              </div>
             </div>
           </div>
           
@@ -350,7 +351,7 @@ const ShingleAnalyzer = () => {
             <h3 className="section-subtitle">How This Works</h3>
             <p className="info-text">
               This analyzer uses OpenAI's Vision API to identify roofing shingle characteristics. 
-              The API examines visual patterns, textures, and colors to determine material type, 
+              The AI examines visual patterns, textures, and colors to determine material type, 
               manufacturer, and specifications. Results are derived directly from AI analysis of 
               your uploaded image.
             </p>
