@@ -1,6 +1,7 @@
 // src/components/ShingleAnalyzer.jsx
 import { useState } from 'react';
 import '../styles/ShingleAnalyzer.css';
+import DamageAssessment from './DamageAssessment';
 
 const ShingleAnalyzer = () => {
   const [file, setFile] = useState(null);
@@ -125,6 +126,17 @@ const ShingleAnalyzer = () => {
                     }
                   });
                   
+                  // Initialize damageAssessment if it doesn't exist
+                  if (!parsedResponse.damageAssessment) {
+                    parsedResponse.damageAssessment = {
+                      overallCondition: 'Unknown',
+                      damageTypes: [],
+                      severity: 0,
+                      description: 'No damage assessment available',
+                      recommendedAction: 'Consider a professional inspection for accurate assessment'
+                    };
+                  }
+                  
                   setResults({
                     specifications: parsedResponse,
                     rawResponse: typeof gptResponse === 'string' ? gptResponse : JSON.stringify(gptResponse, null, 2)
@@ -173,6 +185,13 @@ const ShingleAnalyzer = () => {
                   lifespan: "Unknown",
                   pattern: "Unknown",
                   warranty: "Unknown",
+                  damageAssessment: {
+                    overallCondition: 'Unknown',
+                    damageTypes: [],
+                    severity: 0,
+                    description: 'Unable to assess damage from the provided image',
+                    recommendedAction: 'Consider a professional inspection'
+                  },
                   details: typeof gptResponse === 'string' ? gptResponse : "No text response available"
                 };
                 
@@ -306,6 +325,11 @@ const ShingleAnalyzer = () => {
               <span className="spec-value">{results.specifications.warranty}</span>
             </div>
           </div>
+          
+          {/* Add the damage assessment section */}
+          {results.specifications.damageAssessment && (
+            <DamageAssessment damageData={results.specifications.damageAssessment} />
+          )}
           
           {results.rawResponse && (
             <div className="raw-response">
