@@ -127,7 +127,7 @@ const CostEstimation = ({ damageData }) => {
   if (costEstimate.min === 0 && costEstimate.max === 0) {
     return (
       <div className="cost-estimation">
-        <h3 className="cost-header">Cost Estimation</h3>
+        <h3 className="section-subtitle">Cost Estimation</h3>
         <p className="no-cost-message">No repairs needed. No cost estimate provided.</p>
       </div>
     );
@@ -135,7 +135,7 @@ const CostEstimation = ({ damageData }) => {
 
   return (
     <div className="cost-estimation">
-      <h3 className="cost-header">Cost Estimation</h3>
+      <h3 className="section-subtitle">Cost Estimation</h3>
       
       <div className="cost-range">
         <span className="cost-label">Estimated repair cost:</span>
