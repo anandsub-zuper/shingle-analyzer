@@ -300,3 +300,112 @@
   color: #4caf50;
   font-weight: 500;
 }
+/* Add these styles to your ShingleAnalyzer.css file */
+
+.cost-estimation {
+  margin-top: 25px;
+  padding: 20px;
+  background-color: #f3f8ff;
+  border-radius: 8px;
+  border-left: 4px solid #3182ce;
+}
+
+.cost-header {
+  font-size: 18px;
+  font-weight: 600;
+  margin-bottom: 15px;
+  color: #2c5282;
+}
+
+.cost-range {
+  background-color: #ebf5ff;
+  padding: 15px;
+  border-radius: 6px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 15px;
+}
+
+.cost-label {
+  font-weight: 500;
+  color: #4a5568;
+}
+
+.cost-value {
+  font-size: 18px;
+  font-weight: 700;
+  color: #2c5282;
+}
+
+.cost-disclaimer {
+  font-size: 12px;
+  font-style: italic;
+  color: #718096;
+  margin-bottom: 15px;
+  padding: 0 5px;
+}
+
+.cost-breakdown {
+  margin-top: 20px;
+}
+
+.cost-breakdown h4 {
+  font-size: 16px;
+  font-weight: 600;
+  margin-bottom: 10px;
+  color: #4a5568;
+}
+
+.breakdown-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+.breakdown-table th {
+  text-align: left;
+  padding: 8px;
+  background-color: #edf2f7;
+  color: #4a5568;
+  font-weight: 600;
+}
+
+.breakdown-table td {
+  padding: 8px;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.breakdown-table tr:last-child td {
+  border-bottom: none;
+}
+
+.repair-recommendations {
+  margin-top: 20px;
+}
+
+.repair-recommendations h4 {
+  font-size: 16px;
+  font-weight: 600;
+  margin-bottom: 10px;
+  color: #4a5568;
+}
+
+.repair-vs-replace {
+  margin-top: 15px;
+  padding: 10px;
+  background-color: #fef5ed;
+  border-left: 3px solid #ed8936;
+  border-radius: 4px;
+}
+
+.replace-note {
+  color: #c05621;
+  font-size: 14px;
+  margin: 0;
+}
+
+.no-cost-message {
+  color: #38a169;
+  font-weight: 500;
+}
