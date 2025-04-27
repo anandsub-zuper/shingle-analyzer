@@ -2,6 +2,7 @@
 import { useState } from 'react';
 import '../styles/ShingleAnalyzer.css';
 import DamageAssessment from './DamageAssessment';
+import CostEstimation from './CostEstimation';
 
 const ShingleAnalyzer = () => {
   const [file, setFile] = useState(null);
@@ -329,6 +330,11 @@ const ShingleAnalyzer = () => {
           {/* Add the damage assessment section */}
           {results.specifications.damageAssessment && (
             <DamageAssessment damageData={results.specifications.damageAssessment} />
+          )}
+          
+          {/* Add the cost estimation section */}
+          {results.specifications.damageAssessment && (
+            <CostEstimation damageData={results.specifications.damageAssessment} />
           )}
           
           {results.rawResponse && (
