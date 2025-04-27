@@ -6,25 +6,45 @@ const DamageAssessment = ({ damageData }) => {
 
   // Define severity color scale
   const getSeverityColor = (severity) => {
-    if (severity <= 3) return '#4CAF50'; // Green for minor
-    if (severity <= 6) return '#FFC107'; // Yellow for moderate
-    if (severity <= 8) return '#FF9800'; // Orange for significant
-    return '#F44336'; // Red for severe
+    if (severity <= 3) return 'var(--success)';
+    if (severity <= 6) return 'var(--warning)';
+    if (severity <= 8) return '#FF9800'; // Orange
+    return 'var(--danger)';
   };
 
   // Map condition to icon/color
   const getConditionDisplay = (condition) => {
     switch(condition.toLowerCase()) {
       case 'excellent':
-        return { icon: '✓✓', color: '#4CAF50', description: 'No visible damage, like-new condition' };
+        return { 
+          icon: '✓', 
+          color: 'var(--success)', 
+          description: 'No visible damage, like-new condition' 
+        };
       case 'good':
-        return { icon: '✓', color: '#8BC34A', description: 'Minor wear, fully functional' };
+        return { 
+          icon: '✓', 
+          color: '#8BC34A', 
+          description: 'Minor wear, fully functional' 
+        };
       case 'fair':
-        return { icon: '⚠️', color: '#FFC107', description: 'Noticeable wear, may need attention soon' };
+        return { 
+          icon: '⚠️', 
+          color: 'var(--warning)', 
+          description: 'Noticeable wear, may need attention soon' 
+        };
       case 'poor':
-        return { icon: '❗', color: '#F44336', description: 'Significant damage, needs immediate attention' };
+        return { 
+          icon: '❗', 
+          color: 'var(--danger)', 
+          description: 'Significant damage, needs immediate attention' 
+        };
       default:
-        return { icon: '?', color: '#9E9E9E', description: 'Unknown condition' };
+        return { 
+          icon: '?', 
+          color: 'var(--gray-500)', 
+          description: 'Unknown condition' 
+        };
     }
   };
 
@@ -32,7 +52,7 @@ const DamageAssessment = ({ damageData }) => {
 
   return (
     <div className="damage-assessment">
-      <h3 className="damage-header">Damage Assessment</h3>
+      <h3 className="section-subtitle">Damage Assessment</h3>
       
       <div className="condition-indicator" style={{ backgroundColor: conditionDisplay.color }}>
         <span className="condition-icon">{conditionDisplay.icon}</span>
