@@ -2,10 +2,10 @@
 import React, { useMemo } from 'react';
 
 const CostEstimation = ({ damageData }) => {
-  if (!damageData) return null;
-
   // Calculate cost estimate based on damage assessment data
   const costEstimate = useMemo(() => {
+    if (!damageData) return { min: 0, max: 0, details: [] };
+    
     // Base repair costs by damage type (2025 data)
     const repairCostsByType = {
       'missing shingles': { min: 150, max: 550, unit: 'per area' },
@@ -38,7 +38,7 @@ const CostEstimation = ({ damageData }) => {
     
     // If no specific damage types are found, use overall condition
     if (!damageData.damageTypes || damageData.damageTypes.length === 0) {
-      switch(damageData.overallCondition.toLowerCase()) {
+      switch(damageData.overallCondition?.toLowerCase() || 'unknown') {
         case 'excellent':
           return { min: 0, max: 0, details: [] };
         case 'good':
@@ -120,6 +120,8 @@ const CostEstimation = ({ damageData }) => {
       maximumFractionDigits: 0
     }).format(amount);
   };
+
+  if (!damageData) return null;
 
   // No need to show cost estimate if there's no damage
   if (costEstimate.min === 0 && costEstimate.max === 0) {
