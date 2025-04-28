@@ -1,0 +1,180 @@
+/* src/styles/Roof3DViewer.css */
+.roof-3d-viewer {
+  position: relative;
+  width: 100%;
+  height: 600px;
+  background-color: var(--gray-100);
+  border-radius: var(--border-radius);
+  box-shadow: var(--card-shadow);
+  overflow: hidden;
+  margin-bottom: 2rem;
+}
+
+.viewer-container {
+  width: 100%;
+  height: 100%;
+  cursor: default;
+}
+
+.viewer-container.measuring {
+  cursor: crosshair;
+}
+
+.viewer-toolbar {
+  position: absolute;
+  top: 1rem;
+  left: 1rem;
+  z-index: 10;
+  display: flex;
+  gap: 0.5rem;
+}
+
+.toolbar-button {
+  padding: 0.5rem 1rem;
+  background-color: var(--white);
+  border: 1px solid var(--gray-300);
+  border-radius: 4px;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--gray-800);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.toolbar-button:hover {
+  background-color: var(--gray-100);
+  border-color: var(--gray-400);
+}
+
+.toolbar-button.active {
+  background-color: var(--primary);
+  color: var(--white);
+  border-color: var(--primary-dark);
+}
+
+.measurements-panel {
+  background-color: var(--white);
+  border-radius: var(--border-radius);
+  box-shadow: var(--card-shadow);
+  padding: 1.5rem;
+  margin-top: 1.5rem;
+}
+
+.measurements-panel h3 {
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: var(--gray-800);
+  margin-bottom: 1rem;
+  position: relative;
+  padding-left: 1rem;
+}
+
+.measurements-panel h3::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0.25rem;
+  width: 4px;
+  height: 1rem;
+  background-color: var(--primary);
+  border-radius: 2px;
+}
+
+.measurements-panel h4 {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--gray-700);
+  margin-top: 1rem;
+  margin-bottom: 0.5rem;
+}
+
+.measurement-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.75rem;
+  background-color: var(--gray-100);
+  border-radius: 6px;
+  margin-bottom: 0.75rem;
+}
+
+.measurement-item.damage {
+  background-color: rgba(239, 71, 111, 0.1);
+}
+
+.measurement-label {
+  font-weight: 500;
+  color: var(--gray-700);
+}
+
+.measurement-value {
+  font-weight: 600;
+  color: var(--gray-900);
+}
+
+.distance-measurements ul, 
+.area-measurements ul {
+  list-style-type: none;
+  padding: 0;
+  margin: 0;
+}
+
+.distance-measurements li,
+.area-measurements li {
+  padding: 0.5rem;
+  background-color: var(--gray-100);
+  border-radius: 4px;
+  margin-bottom: 0.5rem;
+  font-size: 0.875rem;
+}
+
+.loading-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(255, 255, 255, 0.8);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  z-index: 20;
+}
+
+.loading-spinner {
+  width: 50px;
+  height: 50px;
+  border: 6px solid var(--gray-200);
+  border-top-color: var(--primary);
+  border-radius: 50%;
+  animation: spin 1s infinite linear;
+  margin-bottom: 1rem;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .roof-3d-viewer {
+    height: 400px;
+  }
+  
+  .viewer-toolbar {
+    flex-direction: column;
+  }
+  
+  .measurement-item {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  
+  .measurement-value {
+    margin-top: 0.25rem;
+  }
+}
