@@ -2,9 +2,13 @@
 import React, { useMemo } from 'react';
 
 const CostEstimation = ({ damageData }) => {
-  // Calculate cost estimate based on damage assessment data
+  // Calculate cost estimate based on damage assessment data and roof measurements
   const costEstimate = useMemo(() => {
     if (!damageData) return { min: 0, max: 0, details: [] };
+    
+    // Extract roof measurements if available
+    const roofMeasurements = damageData.roofMeasurements;
+    const roofArea = roofMeasurements?.area?.total || 0;
     
     // Base repair costs by damage type (2025 data)
     const repairCostsByType = {
@@ -40,18 +44,37 @@ const CostEstimation = ({ damageData }) => {
     
     // If no specific damage types are found, use overall condition
     if (!damageData.damageTypes || damageData.damageTypes.length === 0) {
+      let baseEstimate = { min: 0, max: 0, details: [] };
+      
       switch(damageData.overallCondition?.toLowerCase() || 'unknown') {
         case 'excellent':
-          return { min: 0, max: 0, details: [] };
+          baseEstimate = { min: 0, max: 0, details: [] };
+          break;
         case 'good':
-          return { min: 150, max: 500, details: [{ type: 'minor repairs', min: 150, max: 500 }] };
+          baseEstimate = { min: 150, max: 500, details: [{ type: 'minor repairs', min: 150, max: 500 }] };
+          break;
         case 'fair':
-          return { min: 800, max: 2000, details: [{ type: 'moderate repairs', min: 800, max: 2000 }] };
+          baseEstimate = { min: 800, max: 2000, details: [{ type: 'moderate repairs', min: 800, max: 2000 }] };
+          break;
         case 'poor':
-          return { min: 2000, max: 8000, details: [{ type: 'major repairs', min: 2000, max: 8000 }] };
+          baseEstimate = { min: 2000, max: 8000, details: [{ type: 'major repairs', min: 2000, max: 8000 }] };
+          break;
         default:
-          return { min: 400, max: 1500, details: [{ type: 'general repairs', min: 400, max: 1500 }] };
+          baseEstimate = { min: 400, max: 1500, details: [{ type: 'general repairs', min: 400, max: 1500 }] };
       }
+      
+      // Apply roof area adjustment if available
+      if (roofArea > 0) {
+        const areaSizeFactor = calculateAreaFactor(roofArea);
+        return {
+          min: Math.round(baseEstimate.min * areaSizeFactor),
+          max: Math.round(baseEstimate.max * areaSizeFactor),
+          details: baseEstimate.details,
+          roofArea
+        };
+      }
+      
+      return baseEstimate;
     }
     
     // Calculate based on specific damage types
@@ -66,8 +89,23 @@ const CostEstimation = ({ damageData }) => {
         if (lowerDamageType.includes(key)) {
           // Apply severity multiplier (1.0 for severity 5, scale up or down)
           const severityMultiplier = damageData.severity ? (damageData.severity / 5) : 1.0;
-          const adjustedMin = Math.round(costRange.min * severityMultiplier);
-          const adjustedMax = Math.round(costRange.max * severityMultiplier);
+          
+          // Calculate costs based on whether we're using real roof measurements
+          let adjustedMin, adjustedMax;
+          
+          if (roofArea > 0 && costRange.unit === 'per area') {
+            // For 'per area' costs, calculate based on actual roof area
+            // Assume the cost is per 100 sq ft, and apply to the affected area
+            // Assume 10% of the roof is affected for each detected damage type
+            const affectedArea = roofArea * 0.1;
+            const areaUnits = affectedArea / 100;
+            adjustedMin = Math.round(costRange.min * areaUnits * severityMultiplier);
+            adjustedMax = Math.round(costRange.max * areaUnits * severityMultiplier);
+          } else {
+            // For flat costs, apply severity multiplier only
+            adjustedMin = Math.round(costRange.min * severityMultiplier);
+            adjustedMax = Math.round(costRange.max * severityMultiplier);
+          }
           
           minTotal += adjustedMin;
           maxTotal += adjustedMax;
@@ -107,12 +145,90 @@ const CostEstimation = ({ damageData }) => {
       maxTotal = Math.round(maxTotal * (1 - (overlapDiscount * (foundDamageTypes - 1))));
     }
     
+    // Apply overall roof size adjustment if we have measurements
+    if (roofArea > 0) {
+      const areaSizeFactor = calculateAreaFactor(roofArea);
+      
+      // Only apply size factor to costs that aren't already area-based
+      const areaBasedCosts = costDetails.filter(detail => 
+        Object.entries(repairCostsByType).some(([key, cost]) => 
+          detail.type.toLowerCase().includes(key) && cost.unit === 'per area'
+        )
+      );
+      
+      const nonAreaBasedTotal = costDetails.reduce((sum, detail) => {
+        const isAreaBased = areaBasedCosts.find(c => c.type === detail.type);
+        return sum + (isAreaBased ? 0 : detail.min);
+      }, 0);
+      
+      const areaBasedTotal = costDetails.reduce((sum, detail) => {
+        const isAreaBased = areaBasedCosts.find(c => c.type === detail.type);
+        return sum + (isAreaBased ? detail.min : 0);
+      }, 0);
+      
+      // Apply area factor only to non-area-based costs
+      minTotal = Math.round((nonAreaBasedTotal * areaSizeFactor) + areaBasedTotal);
+      
+      // Same for max costs
+      const nonAreaBasedMaxTotal = costDetails.reduce((sum, detail) => {
+        const isAreaBased = areaBasedCosts.find(c => c.type === detail.type);
+        return sum + (isAreaBased ? 0 : detail.max);
+      }, 0);
+      
+      const areaBasedMaxTotal = costDetails.reduce((sum, detail) => {
+        const isAreaBased = areaBasedCosts.find(c => c.type === detail.type);
+        return sum + (isAreaBased ? detail.max : 0);
+      }, 0);
+      
+      maxTotal = Math.round((nonAreaBasedMaxTotal * areaSizeFactor) + areaBasedMaxTotal);
+    }
+    
+    // Check if full replacement might be more economical
+    const replacementThreshold = 0.35; // If repair costs exceed 35% of replacement, consider replacement
+    let shouldConsiderReplacement = false;
+    let replacementCost = { min: 0, max: 0 };
+    
+    if (roofArea > 0) {
+      // Calculate replacement cost based on current 2025 rates
+      // Average cost per sq ft for replacement ranges from $5.50 to $12.50
+      replacementCost = {
+        min: Math.round(roofArea * 5.5),
+        max: Math.round(roofArea * 12.5)
+      };
+      
+      // If repair cost exceeds threshold of replacement cost, suggest considering replacement
+      if (minTotal > replacementCost.min * replacementThreshold) {
+        shouldConsiderReplacement = true;
+      }
+    } else if (maxTotal > 5000) {
+      // Without area measurements, use a flat threshold
+      shouldConsiderReplacement = true;
+    }
+    
     return {
       min: minTotal,
       max: maxTotal,
-      details: costDetails
+      details: costDetails,
+      roofArea: roofArea > 0 ? roofArea : null,
+      shouldConsiderReplacement,
+      replacementCost: shouldConsiderReplacement ? replacementCost : null
     };
   }, [damageData]);
+
+  // Helper function to calculate area adjustment factor
+  const calculateAreaFactor = (area) => {
+    // Base the factor on average roof size (around 1,700 sq ft)
+    const averageRoofSize = 1700;
+    
+    // Calculate factor with diminishing returns for very large roofs
+    if (area <= averageRoofSize) {
+      // Linear scaling for smaller roofs
+      return Math.max(0.8, area / averageRoofSize);
+    } else {
+      // Logarithmic scaling for larger roofs to account for economies of scale
+      return Math.min(2.0, 1 + (Math.log(area / averageRoofSize) / Math.log(3)));
+    }
+  };
 
   // Format currency
   const formatCurrency = (amount) => {
@@ -143,6 +259,13 @@ const CostEstimation = ({ damageData }) => {
         <span className="cost-label">Estimated repair cost:</span>
         <span className="cost-value">{formatCurrency(costEstimate.min)} - {formatCurrency(costEstimate.max)}</span>
       </div>
+      
+      {costEstimate.roofArea && (
+        <div className="roof-area-info">
+          <span className="roof-area-label">Based on roof area:</span>
+          <span className="roof-area-value">{costEstimate.roofArea.toLocaleString()} sq ft</span>
+        </div>
+      )}
       
       <div className="cost-disclaimer">
         <p>This is an automated estimate based on 2025 national average repair costs. Actual costs may vary based on your location, contractor rates, and the specific details of your roof.</p>
@@ -182,10 +305,26 @@ const CostEstimation = ({ damageData }) => {
         <h4>Repair Recommendations</h4>
         <p>{damageData.recommendedAction || "Contact a professional roofer for an accurate assessment and quote."}</p>
         
-        {costEstimate.max > 5000 && (
+        {costEstimate.shouldConsiderReplacement && costEstimate.replacementCost && (
           <div className="repair-vs-replace">
+            <h4>Repair vs. Replace Consideration</h4>
             <p className="replace-note">
-              Note: If repairs exceed $5,000-$8,000, you may want to consider a full roof replacement instead, especially if your roof is over 15 years old.
+              Based on the estimated repair costs, you may want to consider a full roof replacement instead.
+              Estimated replacement cost: {formatCurrency(costEstimate.replacementCost.min)} - {formatCurrency(costEstimate.replacementCost.max)}
+            </p>
+            <ul className="replacement-factors">
+              <li>Repairs exceed 35% of replacement cost, making replacement more cost-effective long-term</li>
+              <li>Full replacement provides new warranty coverage</li>
+              <li>New materials will have better energy efficiency and appearance</li>
+              <li>Consider replacement especially if your roof is over 15 years old</li>
+            </ul>
+          </div>
+        )}
+        
+        {!costEstimate.shouldConsiderReplacement && costEstimate.max > 3000 && (
+          <div className="repair-vs-replace">
+            <p className="repair-note">
+              While repairs are likely more cost-effective than replacement, consider getting quotes for both options to make an informed decision.
             </p>
           </div>
         )}
