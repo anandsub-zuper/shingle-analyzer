@@ -151,28 +151,30 @@ const CostEstimation = ({ damageData }) => {
       {costEstimate.details && costEstimate.details.length > 0 && (
         <div className="cost-breakdown">
           <h4>Cost Breakdown</h4>
-          <table className="breakdown-table">
-            <thead>
-              <tr>
-                <th>Issue</th>
-                <th>Estimated Range</th>
-              </tr>
-            </thead>
-            <tbody>
-              {costEstimate.details.map((detail, index) => (
-                <tr key={index}>
-                  <td>{detail.type}</td>
-                  <td>{formatCurrency(detail.min)} - {formatCurrency(detail.max)}</td>
+          <div className="table-responsive">
+            <table className="breakdown-table">
+              <thead>
+                <tr>
+                  <th className="issue-header">Issue</th>
+                  <th className="range-header">Estimated Range</th>
                 </tr>
-              ))}
-              {costEstimate.details.length > 1 && (
-                <tr className="total-cost-row">
-                  <td>Total (with 15% overlap discount)</td>
-                  <td>{formatCurrency(costEstimate.min)} - {formatCurrency(costEstimate.max)}</td>
-                </tr>
-              )}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {costEstimate.details.map((detail, index) => (
+                  <tr key={index}>
+                    <td className="issue-cell">{detail.type}</td>
+                    <td className="range-cell">{formatCurrency(detail.min)} - {formatCurrency(detail.max)}</td>
+                  </tr>
+                ))}
+                {costEstimate.details.length > 1 && (
+                  <tr className="total-cost-row">
+                    <td className="issue-cell">Total (with 15% overlap discount)</td>
+                    <td className="range-cell">{formatCurrency(costEstimate.min)} - {formatCurrency(costEstimate.max)}</td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
       
