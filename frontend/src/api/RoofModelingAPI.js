@@ -4,7 +4,7 @@
  * Handles communication with the Vultr GPU server
  */
 
-const API_BASE_URL = 'https://api.allorigins.win/raw?url=http://66.135.21.204:5001';
+const API_BASE_URL = 'http://66.135.21.204:5001';
 
 /**
  * Upload multiple roof images and start the 3D modeling process
