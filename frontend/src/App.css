@@ -4,10 +4,12 @@
   background-color: #f0f4f8;
   min-height: 100vh;
   padding: 20px;
+  display: flex;
+  flex-direction: column;
 }
 
 .App-header {
-  margin-bottom: 40px;
+  margin-bottom: 30px;
   padding: 20px;
   color: #2c5282;
 }
@@ -15,11 +17,13 @@
 .App-header h1 {
   font-size: 2.5rem;
   margin-bottom: 10px;
+  color: #2c5282;
 }
 
 .App-header p {
   font-size: 1.2rem;
   color: #4a5568;
+  margin-bottom: 1.5rem;
 }
 
 main {
@@ -28,6 +32,7 @@ main {
   width: 100%;
   max-width: 1200px;
   margin: 0 auto;
+  flex: 1;
 }
 
 .App-footer {
@@ -35,4 +40,80 @@ main {
   padding: 20px;
   color: #718096;
   font-size: 0.9rem;
+  background-color: #e2e8f0;
+  border-top: 1px solid #cbd5e0;
+}
+
+.footer-content {
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 20px;
+  margin-bottom: 10px;
+}
+
+.footer-item {
+  display: flex;
+  align-items: center;
+}
+
+.footer-label {
+  font-weight: 600;
+  margin-right: 5px;
+}
+
+.copyright {
+  font-size: 0.8rem;
+  color: #718096;
+  margin-top: 10px;
+}
+
+/* Navigation */
+.main-nav {
+  display: flex;
+  justify-content: center;
+  gap: 15px;
+  margin-bottom: 10px;
+}
+
+.nav-link {
+  text-decoration: none;
+  color: #4a5568;
+  font-weight: 500;
+  padding: 10px 20px;
+  border-radius: 8px;
+  transition: all 0.3s ease;
+  background-color: #e2e8f0;
+}
+
+.nav-link:hover {
+  background-color: #cbd5e0;
+  transform: translateY(-2px);
+}
+
+.nav-link.active {
+  background-color: #4361ee;
+  color: white;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .App-header h1 {
+    font-size: 1.8rem;
+  }
+  
+  .App-header p {
+    font-size: 1rem;
+  }
+  
+  .main-nav {
+    flex-direction: column;
+    gap: 10px;
+  }
+  
+  .footer-content {
+    flex-direction: column;
+    gap: 10px;
+    align-items: center;
+  }
 }
