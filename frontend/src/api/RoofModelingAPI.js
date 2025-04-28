@@ -4,7 +4,7 @@
  * Handles communication with the Vultr GPU server
  */
 
-const API_BASE_URL = 'http://66.135.21.204:5000';
+const API_BASE_URL = 'https://corsproxy.io/?http://66.135.21.204:5000';
 
 /**
  * Upload multiple roof images and start the 3D modeling process
