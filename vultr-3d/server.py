@@ -1,623 +1,540 @@
-#!/usr/bin/env python3
-"""
-server.py - Flask API server for 3D roof modeling
-Runs on Vultr GPU instance with NVIDIA A40-8Q GPU
-
-This server processes multiple roof images to create 3D models using NeRF technology.
-"""
-
+from flask import Flask, request, jsonify, send_from_directory
+from flask_cors import CORS
 import os
 import uuid
-import json
-import logging
-import shutil
-import threading
-import time
-from datetime import datetime
-from pathlib import Path
-
-from flask import Flask, request, jsonify, send_file
-from flask_cors import CORS
 import subprocess
+import logging
+import json
+import time
+import shutil
+import numpy as np
+import struct
+import collections
+from datetime import datetime
+import threading
 
 # Configure logging
 logging.basicConfig(
     level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    handlers=[
-        logging.FileHandler("/root/roof-nerf-project/server.log"),
-        logging.StreamHandler()
-    ]
+    format='%(asctime)s - **%(name)s** - %(levelname)s - %(message)s'
 )
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("__main__")
 
-# Flask app setup
 app = Flask(__name__)
-
-# Set maximum content length for file uploads (100MB)
-app.config['MAX_CONTENT_LENGTH'] = 100 * 1024 * 1024
-
-# Configure CORS - Allow requests from all origins
-CORS(app, resources={
-    r"/*": {
-        "origins": "*",
-        "methods": ["GET", "POST", "OPTIONS"],
-        "allow_headers": ["Content-Type", "Authorization"]
-    }
-})
+CORS(app)
 
 # Configuration
-BASE_DIR = Path("/root/roof-nerf-project")
-UPLOADS_DIR = BASE_DIR / "uploads"
-RESULTS_DIR = BASE_DIR / "results"
-COLMAP_DIR = BASE_DIR / "colmap"
-NERFSTUDIO_DIR = BASE_DIR / "nerfstudio"
+UPLOAD_FOLDER = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'uploads')
+RESULTS_FOLDER = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'results')
+ALLOWED_EXTENSIONS = {'jpg', 'jpeg', 'png'}
+MAX_IMAGES = 50
 
-# Make sure directories exist
-UPLOADS_DIR.mkdir(exist_ok=True)
-RESULTS_DIR.mkdir(exist_ok=True)
-COLMAP_DIR.mkdir(exist_ok=True)
+# Ensure folders exist
+os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+os.makedirs(RESULTS_FOLDER, exist_ok=True)
 
-# Active jobs - dictionary to store job information
-active_jobs = {}
+# In-memory database to track job status
+jobs = {}
 
-# Lock for accessing the active_jobs dictionary
-jobs_lock = threading.Lock()
+# COLMAP to NeRF Conversion Utilities
+def read_next_bytes(fid, num_bytes, format_char_sequence, endian_character="<"):
+    """Read and unpack the next bytes from a binary file."""
+    data = fid.read(num_bytes)
+    return struct.unpack(endian_character + format_char_sequence, data)
 
-def ensure_dir(directory):
-    """Ensure directory exists, create if not"""
-    Path(directory).mkdir(exist_ok=True, parents=True)
+def read_cameras_binary(path_to_model_file):
+    """Read camera parameters from binary file."""
+    cameras = {}
+    Camera = collections.namedtuple(
+        "Camera", ["id", "model", "width", "height", "params"]
+    )
+    with open(path_to_model_file, "rb") as fid:
+        num_cameras = read_next_bytes(fid, 8, "Q")[0]
+        for _ in range(num_cameras):
+            camera_properties = read_next_bytes(
+                fid, 24, "iiQQ")
+            camera_id = camera_properties[0]
+            model_id = camera_properties[1]
+            width = camera_properties[2]
+            height = camera_properties[3]
+            num_params = 4
+            if model_id == 2:  # PINHOLE
+                num_params = 4
+            elif model_id == 3:  # RADIAL
+                num_params = 5
+            elif model_id == 4:  # OPENCV
+                num_params = 8
+            elif model_id == 5:  # OPENCV_FISHEYE
+                num_params = 8
+            elif model_id == 6:  # FULL_OPENCV
+                num_params = 12
+            elif model_id == 7:  # FOV
+                num_params = 5
+            elif model_id == 8:  # SIMPLE_RADIAL_FISHEYE
+                num_params = 5
+            elif model_id == 9:  # RADIAL_FISHEYE
+                num_params = 8
+            elif model_id == 10:  # THIN_PRISM_FISHEYE
+                num_params = 12
+            params = read_next_bytes(fid, 8 * num_params, "d" * num_params)
+            cameras[camera_id] = Camera(
+                id=camera_id, model=model_id, width=width, height=height, params=params
+            )
+        assert len(cameras) == num_cameras
+    return cameras
 
-def calculate_roof_measurements(model_path):
-    """
-    Calculate accurate measurements from the 3D model using trimesh library
-    
-    Args:
-        model_path (str or Path): Path to the glTF/GLB model file
-        
-    Returns:
-        dict: Dictionary containing roof measurements including area, pitch, dimensions, etc.
-    """
-    import trimesh
-    import numpy as np
-    import math
-    from pathlib import Path
-    
-    logger.info(f"Calculating measurements for model: {model_path}")
-    
-    try:
-        # Load the 3D model
-        model = trimesh.load(model_path)
-        
-        if isinstance(model, trimesh.Scene):
-            # If it's a scene (like in glTF), extract all meshes
-            meshes = [m for m in model.geometry.values()]
-            # Combine all meshes if needed for analysis
-            combined_mesh = trimesh.util.concatenate(meshes)
-        else:
-            # Single mesh
-            combined_mesh = model
+def read_images_binary(path_to_model_file):
+    """Read camera positions from binary file."""
+    images = {}
+    Image = collections.namedtuple(
+        "Image", ["id", "qvec", "tvec", "camera_id", "name", "xys", "point3D_ids"]
+    )
+    with open(path_to_model_file, "rb") as fid:
+        num_images = read_next_bytes(fid, 8, "Q")[0]
+        for _ in range(num_images):
+            binary_image_properties = read_next_bytes(
+                fid, 64, "idddddddi")
+            image_id = binary_image_properties[0]
+            qvec = binary_image_properties[1:5]
+            tvec = binary_image_properties[5:8]
+            camera_id = binary_image_properties[8]
+
+            image_name = ""
+            current_char = read_next_bytes(fid, 1, "c")[0]
+            while current_char != b"\x00":
+                image_name += current_char.decode("utf-8")
+                current_char = read_next_bytes(fid, 1, "c")[0]
+
+            num_points2D = read_next_bytes(fid, 8, "Q")[0]
+            x_y_id_s = read_next_bytes(fid, 24 * num_points2D, "ddq" * num_points2D)
+            xys = []
+            point3D_ids = []
+            for i in range(num_points2D):
+                xys.append((float(x_y_id_s[3 * i]), float(x_y_id_s[3 * i + 1])))
+                point3D_ids.append(x_y_id_s[3 * i + 2])
             
-        # Calculate total surface area in square feet
-        # 1 sq meter = 10.764 sq feet
-        area_sqft = combined_mesh.area * 10.764
+            images[image_id] = Image(
+                id=image_id, qvec=qvec, tvec=tvec, camera_id=camera_id, name=image_name,
+                xys=xys, point3D_ids=point3D_ids
+            )
+    return images
+
+def qvec2rotmat(qvec):
+    return np.array([
+        [1 - 2 * qvec[2]**2 - 2 * qvec[3]**2, 2 * qvec[1] * qvec[2] - 2 * qvec[0] * qvec[3], 2 * qvec[3] * qvec[1] + 2 * qvec[0] * qvec[2]],
+        [2 * qvec[1] * qvec[2] + 2 * qvec[0] * qvec[3], 1 - 2 * qvec[1]**2 - 2 * qvec[3]**2, 2 * qvec[2] * qvec[3] - 2 * qvec[0] * qvec[1]],
+        [2 * qvec[3] * qvec[1] - 2 * qvec[0] * qvec[2], 2 * qvec[2] * qvec[3] + 2 * qvec[0] * qvec[1], 1 - 2 * qvec[1]**2 - 2 * qvec[2]**2]])
+
+def find_image_files(image_dir):
+    """Find all image files in the directory."""
+    image_files = []
+    for file in os.listdir(image_dir):
+        if file.lower().endswith(('.png', '.jpg', '.jpeg')):
+            image_files.append(file)
+    return image_files
+
+def convert_colmap_to_transforms(colmap_dir, image_dir, output_path):
+    """Convert COLMAP binary output to transforms.json format for NeRF."""
+    # Read COLMAP binary files
+    cameras_path = os.path.join(colmap_dir, 'cameras.bin')
+    images_path = os.path.join(colmap_dir, 'images.bin')
+    
+    if not os.path.exists(cameras_path) or not os.path.exists(images_path):
+        print("Error: cameras.bin or images.bin not found")
+        return False
+    
+    cameras = read_cameras_binary(cameras_path)
+    images = read_images_binary(images_path)
+    
+    print(f"Found {len(cameras)} cameras and {len(images)} images")
+    
+    # Find all image files in the directory
+    all_image_files = find_image_files(image_dir)
+    print(f"Found {len(all_image_files)} image files in directory")
+    
+    frames = []
+    for image_id, image_info in images.items():
+        # Get camera info
+        camera_id = image_info.camera_id
+        camera = cameras[camera_id]
         
-        # Get bounding box for dimensions
-        bounds = combined_mesh.bounds
-        min_corner = bounds[0]
-        max_corner = bounds[1]
+        # Convert quaternion to rotation matrix
+        qvec = image_info.qvec
+        R = qvec2rotmat(qvec)
         
-        # Calculate dimensions in feet (assuming model is in meters)
-        length_ft = (max_corner[0] - min_corner[0]) * 3.28084  # meters to feet
-        width_ft = (max_corner[1] - min_corner[1]) * 3.28084
-        height_ft = (max_corner[2] - min_corner[2]) * 3.28084
+        # Convert COLMAP's camera coordinate system to NeRF
+        R = np.array([[1, 0, 0], [0, -1, 0], [0, 0, -1]]) @ R
+        t = -R @ np.array(image_info.tvec)
         
-        # Calculate roof pitch by analyzing face normals
-        # Get all face normals
-        face_normals = combined_mesh.face_normals
+        # Calculate camera-to-world transform matrix
+        transform_matrix = np.eye(4)
+        transform_matrix[:3, :3] = R
+        transform_matrix[:3, 3] = t
         
-        # Calculate the pitch of each face
-        pitches = []
-        for normal in face_normals:
-            # The normal's Z component represents the face's verticality
-            # A roof pitch is typically the ratio of rise to run
-            # rise/run = tan(angle from horizontal)
-            
-            # Skip nearly vertical faces (walls) or horizontal faces (flat parts)
-            if abs(normal[2]) < 0.1 or abs(normal[2]) > 0.95:
-                continue
+        # Get image name
+        image_name = image_info.name
+        
+        # Get focal length
+        focal_x = camera.params[0]
+        focal_y = focal_x  # Default to square pixels
+        
+        # Get principal point
+        cx = camera.width / 2
+        cy = camera.height / 2
+        
+        if camera.model == 2:  # PINHOLE
+            if len(camera.params) >= 4:
+                focal_y = camera.params[1]
+                cx = camera.params[2]
+                cy = camera.params[3]
                 
-            # Calculate the angle from horizontal in degrees
-            angle_rad = math.atan2(normal[2], math.sqrt(normal[0]**2 + normal[1]**2))
-            angle_deg = math.degrees(angle_rad)
-            
-            # Convert to standard roof pitch notation (X/12)
-            # A 45-degree angle is approximately 12/12 pitch
-            rise = round(math.tan(angle_rad) * 12)
-            pitch = f"{rise}/12"
-            
-            pitches.append({
-                'pitch': pitch,
-                'degrees': round(angle_deg, 1),
-                'area': 0  # We'll calculate area per pitch later
-            })
+        if camera.model == 3:  # RADIAL
+            if len(camera.params) >= 4:
+                cx = camera.params[1]
+                cy = camera.params[2]
         
-        # Group similar pitches (within 2 degrees)
-        grouped_pitches = []
-        for pitch in pitches:
-            found_group = False
-            for group in grouped_pitches:
-                if abs(group['degrees'] - pitch['degrees']) < 2:
-                    # Average the degrees when grouping
-                    group['count'] = group.get('count', 1) + 1
-                    group['degrees'] = (group['degrees'] * (group['count'] - 1) + 
-                                       pitch['degrees']) / group['count']
-                    # Recalculate the pitch notation
-                    rise = round(math.tan(math.radians(group['degrees'])) * 12)
-                    group['pitch'] = f"{rise}/12"
-                    found_group = True
-                    break
-            
-            if not found_group:
-                grouped_pitches.append({
-                    'pitch': pitch['pitch'],
-                    'degrees': pitch['degrees'],
-                    'count': 1
-                })
-        
-        # Sort by count to find the primary/most common pitch
-        grouped_pitches.sort(key=lambda x: x.get('count', 0), reverse=True)
-        
-        # Determine the primary pitch (most common)
-        primary_pitch = grouped_pitches[0]['pitch'] if grouped_pitches else "Unknown"
-        primary_degrees = grouped_pitches[0]['degrees'] if grouped_pitches else 0
-        
-        # Detect roof features by analyzing the mesh
-        features = detect_roof_features(combined_mesh)
-        
-        # Calculate plane segmentation to identify different roof sections
-        segments = segment_roof_planes(combined_mesh)
-        
-        # Create the measurements dictionary
-        measurements = {
-            "area": {
-                "total": round(area_sqft),
-                "unit": "sq_ft",
-                "sections": segments['areas'] if 'areas' in segments else []
-            },
-            "pitch": {
-                "primary": primary_pitch,
-                "degrees": primary_degrees,
-                "all": [{'pitch': p['pitch'], 'degrees': p['degrees']} 
-                       for p in grouped_pitches[:3]]  # Include top 3 pitches
-            },
-            "dimensions": {
-                "length": round(length_ft, 1),
-                "width": round(width_ft, 1),
-                "height": round(height_ft, 1)
-            },
-            "features": features,
-            "accuracy": {
-                "estimated_error_margin": "±5%",
-                "confidence": "high"
-            }
+        # Ensure all required fields are included
+        frame = {
+            "file_path": image_name,
+            "transform_matrix": transform_matrix.tolist(),
+            "w": int(camera.width),  # Add w field
+            "h": int(camera.height),  # Add h field
+            "width": int(camera.width),  # Add width field
+            "height": int(camera.height),  # Add height field
+            "fl_x": float(focal_x),
+            "fl_y": float(focal_y),
+            "cx": float(cx),
+            "cy": float(cy),
+            "k1": 0.0,  # Add distortion parameters
+            "k2": 0.0,
+            "p1": 0.0,
+            "p2": 0.0
         }
-        
-        logger.info(f"Measurements calculated successfully: Area={measurements['area']['total']} sq ft, "
-                   f"Pitch={measurements['pitch']['primary']}")
-        
-        return measurements
-        
+        frames.append(frame)
+    
+    # Sort frames by filename
+    frames.sort(key=lambda f: f["file_path"])
+    
+    # Calculate camera_angle_x
+    camera_angle_x = 0.8575560450553894  # Default placeholder
+    
+    if len(frames) > 0:
+        first_camera = frames[0]
+        focal_length = first_camera["fl_x"]
+        width = first_camera["width"]
+        camera_angle_x = 2 * np.arctan(width / (2 * focal_length))
+    
+    # Create transforms.json
+    transforms = {
+        "camera_angle_x": float(camera_angle_x),
+        "frames": frames
+    }
+    
+    # Save transforms.json
+    try:
+        with open(output_path, 'w') as f:
+            json.dump(transforms, f, indent=4)
+        print(f"Successfully wrote transforms.json with {len(frames)} frames to {output_path}")
+        return True
     except Exception as e:
-        logger.error(f"Error calculating measurements: {e}", exc_info=True)
-        # Return fallback measurements if calculation fails
-        return {
-            "area": {
-                "total": 2000,  # Fallback area estimate
-                "unit": "sq_ft",
-                "estimated": True
-            },
-            "pitch": {
-                "primary": "6/12",  # Common pitch as fallback
-                "degrees": 26.6,
-                "estimated": True
-            },
-            "dimensions": {
-                "length": 60,
-                "width": 40,
-                "height": 15,
-                "estimated": True
-            },
-            "features": {
-                "chimneys": 0,
-                "vents": 0,
-                "skylights": 0,
-                "estimated": True
-            },
-            "accuracy": {
-                "estimated_error_margin": "±20%",
-                "confidence": "low",
-                "error": str(e)
-            }
-        }
+        print(f"Error writing transforms.json: {str(e)}")
+        return False
 
-def segment_roof_planes(mesh):
-    """
-    Segment the roof into distinct planes/sections
-    
-    Args:
-        mesh (trimesh.Trimesh): The roof mesh
-        
-    Returns:
-        dict: Information about the segmented planes
-    """
-    import numpy as np
-    from sklearn.cluster import DBSCAN
-    
-    try:
-        # Get face normals and centroids
-        normals = mesh.face_normals
-        face_areas = mesh.area_faces
-        
-        # Use DBSCAN to cluster faces by their normal direction
-        # This groups faces that have similar orientation (i.e., are on the same plane)
-        clustering = DBSCAN(eps=0.1, min_samples=5).fit(normals)
-        labels = clustering.labels_
-        
-        # Count clusters (ignoring noise with label -1)
-        n_clusters = len(set(labels)) - (1 if -1 in labels else 0)
-        
-        # Calculate area of each segment
-        segment_areas = []
-        for i in range(n_clusters):
-            # Sum the areas of all faces in this segment
-            segment_mask = (labels == i)
-            segment_area = np.sum(face_areas[segment_mask])
-            
-            # Convert to square feet
-            segment_area_sqft = segment_area * 10.764
-            
-            # Calculate average normal for this segment
-            segment_normals = normals[segment_mask]
-            avg_normal = np.mean(segment_normals, axis=0)
-            avg_normal = avg_normal / np.linalg.norm(avg_normal)
-            
-            # Calculate pitch for this segment
-            angle_rad = np.arccos(np.clip(np.dot(avg_normal, [0, 0, 1]), -1.0, 1.0))
-            angle_deg = np.degrees(angle_rad)
-            
-            # Calculate standard roof pitch notation
-            rise = round(np.tan(angle_rad) * 12)
-            pitch = f"{rise}/12"
-            
-            segment_areas.append({
-                "id": i,
-                "area": round(segment_area_sqft),
-                "pitch": pitch,
-                "degrees": round(angle_deg, 1)
-            })
-        
-        # Sort segments by area (largest first)
-        segment_areas.sort(key=lambda x: x["area"], reverse=True)
-        
-        return {
-            "count": n_clusters,
-            "areas": segment_areas
-        }
-        
-    except Exception as e:
-        logger.error(f"Error in plane segmentation: {e}", exc_info=True)
-        return {
-            "count": 1,
-            "areas": [],
-            "error": str(e)
-        }
+def allowed_file(filename):
+    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
-def detect_roof_features(mesh):
-    """
-    Detect features like chimneys, vents, skylights on the roof
-    
-    Args:
-        mesh (trimesh.Trimesh): The roof mesh
-        
-    Returns:
-        dict: Detected features and counts
-    """
-    try:
-        # This would normally use more sophisticated analysis
-        # For example, looking for vertical protrusions (chimneys),
-        # rectangular cutouts (skylights), or small circular elements (vents)
-        
-        # For now, we'll implement a basic heuristic detection based on
-        # connected components and their dimensions
-        
-        # Split mesh into connected components
-        components = mesh.split(only_watertight=False)
-        
-        # Initialize feature counts
-        chimneys = 0
-        vents = 0
-        skylights = 0
-        
-        # Analyze each component
-        for comp in components:
-            # Skip very large components (likely the main roof)
-            if comp.area > (mesh.area * 0.1):
-                continue
-                
-            # Get component dimensions
-            bounds = comp.bounds
-            min_corner = bounds[0]
-            max_corner = bounds[1]
-            
-            width = max_corner[0] - min_corner[0]
-            length = max_corner[1] - min_corner[1]
-            height = max_corner[2] - min_corner[2]
-            
-            # Simple heuristics for classification
-            # These would be tuned based on actual models
-            
-            # Chimneys are typically tall and narrow
-            if height > 1.0 and width < 1.0 and length < 1.0:
-                chimneys += 1
-                
-            # Vents are small and often circular or square
-            elif width < 0.5 and length < 0.5 and height < 0.3:
-                vents += 1
-                
-            # Skylights are typically rectangular and flat
-            elif width > 0.5 and length > 0.5 and height < 0.3:
-                skylights += 1
-        
-        return {
-            "chimneys": chimneys,
-            "vents": vents,
-            "skylights": skylights,
-            "total_features": chimneys + vents + skylights
-        }
-        
-    except Exception as e:
-        logger.error(f"Error detecting roof features: {e}", exc_info=True)
-        return {
-            "chimneys": 0,
-            "vents": 0,
-            "skylights": 0,
-            "total_features": 0,
-            "error": str(e)
-        }
+def update_job_status(job_id, status, progress=0, message=""):
+    """Update job status and log it"""
+    timestamp = datetime.now().isoformat()
+    jobs[job_id] = {
+        "id": job_id,
+        "status": status,
+        "progress": progress,
+        "message": message,
+        "createdAt": jobs.get(job_id, {}).get("createdAt", timestamp),
+        "updatedAt": timestamp,
+        "imageCount": jobs.get(job_id, {}).get("imageCount", 0)
+    }
+    logger.info(f"Job {job_id} status updated: {status}, {progress}%, {message}")
 
-def process_images(job_id, image_dir):
-    """
-    Process the uploaded images to create a 3D model
-    This function runs in a separate thread
-    """
+def run_colmap_pipeline(job_id, job_dir, image_dir):
+    """Run the COLMAP pipeline using CPU-only mode for maximum compatibility"""
     try:
-        update_job_status(job_id, "processing", 5, "Starting image processing...")
+        # Set environment variables to force offscreen rendering
+        my_env = os.environ.copy()
+        my_env["QT_QPA_PLATFORM"] = "offscreen"
+        my_env["DISPLAY"] = ""
         
-        # Directory setup
-        job_dir = RESULTS_DIR / job_id
-        ensure_dir(job_dir)
-        output_dir = job_dir / "output"
-        ensure_dir(output_dir)
+        # Create COLMAP workspace
+        colmap_dir = os.path.join(job_dir, "colmap")
+        os.makedirs(colmap_dir, exist_ok=True)
         
-        # Step 1: Run COLMAP for camera position estimation
-        logger.info(f"Starting COLMAP for job {job_id}")
-        update_job_status(job_id, "processing", 10, "Running COLMAP for camera position estimation...")
+        # Directory for sparse reconstruction
+        sparse_dir = os.path.join(colmap_dir, "sparse")
+        os.makedirs(sparse_dir, exist_ok=True)
         
-        colmap_output_dir = job_dir / "colmap"
-        ensure_dir(colmap_output_dir)
+        # Database path
+        db_path = os.path.join(colmap_dir, "database.db")
         
-        # Run COLMAP SfM to estimate camera positions
-        colmap_cmd = [
-            "colmap", "automatic_reconstructor",
-            "--workspace_path", str(colmap_output_dir),
-            "--image_path", str(image_dir)
+        # Step 1: Feature extraction - using CPU
+        update_job_status(job_id, "processing", 15, "Running feature extraction (CPU)...")
+        logger.info(f"Starting CPU-based feature extraction for job {job_id}")
+        
+        feature_cmd = [
+            "colmap", "feature_extractor",
+            "--database_path", db_path,
+            "--image_path", image_dir,
+            "--SiftExtraction.use_gpu", "0",  # Force CPU extraction
+            "--SiftExtraction.max_num_features", "8192",  # Extract more features
+            "--SiftExtraction.first_octave", "-1",  # Start at full resolution
+            "--SiftExtraction.num_octaves", "4",  # Use more octaves for better matching
+            "--SiftExtraction.peak_threshold", "0.004"  # Lower threshold to get more features
         ]
         
-        try:
-            subprocess.run(colmap_cmd, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-            logger.info(f"COLMAP finished for job {job_id}")
-            update_job_status(job_id, "processing", 30, "Camera positions estimated successfully")
-        except subprocess.CalledProcessError as e:
-            logger.error(f"COLMAP failed for job {job_id}: {e}")
-            logger.error(f"STDOUT: {e.stdout.decode() if e.stdout else 'None'}")
-            logger.error(f"STDERR: {e.stderr.decode() if e.stderr else 'None'}")
-            update_job_status(job_id, "error", 0, "Failed to estimate camera positions")
-            return
+        logger.info(f"Running command: {' '.join(feature_cmd)}")
+        feature_process = subprocess.run(
+            feature_cmd, 
+            env=my_env, 
+            check=True,
+            capture_output=True,
+            text=True
+        )
+        
+        logger.info(f"Feature extraction stdout: {feature_process.stdout}")
+        if feature_process.stderr:
+            logger.warning(f"Feature extraction stderr: {feature_process.stderr}")
+        
+        # Step 2: Match features - using CPU
+        update_job_status(job_id, "processing", 40, "Matching features (CPU)...")
+        logger.info(f"Starting CPU-based feature matching for job {job_id}")
+        
+        match_cmd = [
+            "colmap", "exhaustive_matcher",
+            "--database_path", db_path,
+            "--SiftMatching.use_gpu", "0",  # Force CPU matching
+            "--SiftMatching.max_ratio", "0.9",  # More permissive ratio test (default is 0.8)
+            "--SiftMatching.max_distance", "0.7",  # More permissive distance threshold
+            "--SiftMatching.cross_check", "1"  # Enable cross-checking for more reliable matches
+        ]
+        
+        logger.info(f"Running command: {' '.join(match_cmd)}")
+        match_process = subprocess.run(
+            match_cmd, 
+            env=my_env, 
+            check=True,
+            capture_output=True,
+            text=True
+        )
+        
+        logger.info(f"Feature matching stdout: {match_process.stdout}")
+        if match_process.stderr:
+            logger.warning(f"Feature matching stderr: {match_process.stderr}")
+        
+        # Check if there were matches
+        if "WARNING: No images with matches found in the database" in match_process.stdout:
+            # Try sequential matcher as fallback
+            update_job_status(job_id, "processing", 45, "Trying sequential matcher...")
+            logger.info(f"Using sequential matcher for job {job_id}")
             
-        # Step 2: Train NeRF model using Nerfstudio
+            seq_match_cmd = [
+                "colmap", "sequential_matcher",
+                "--database_path", db_path,
+                "--SiftMatching.use_gpu", "0",
+                "--SequentialMatching.overlap", "10",
+                "--SequentialMatching.quadratic_overlap", "1",
+                "--SequentialMatching.loop_detection", "1",
+                "--SequentialMatching.loop_detection_period", "10"
+            ]
+            
+            logger.info(f"Running command: {' '.join(seq_match_cmd)}")
+            seq_match_process = subprocess.run(
+                seq_match_cmd, 
+                env=my_env, 
+                check=True,
+                capture_output=True,
+                text=True
+            )
+            
+            logger.info(f"Sequential matching stdout: {seq_match_process.stdout}")
+            if seq_match_process.stderr:
+                logger.warning(f"Sequential matching stderr: {seq_match_process.stderr}")
+                
+            # Check if still no matches
+            if "WARNING: No images with matches found in the database" in seq_match_process.stdout:
+                raise Exception("Failed to find matches between images. The images may not have enough overlap or distinct features.")
+        
+        # Step 3: Sparse reconstruction (mapper)
+        update_job_status(job_id, "processing", 60, "Building sparse reconstruction...")
+        logger.info(f"Starting sparse reconstruction for job {job_id}")
+        
+        mapper_cmd = [
+            "colmap", "mapper",
+            "--database_path", db_path,
+            "--image_path", image_dir,
+            "--output_path", sparse_dir,
+            "--Mapper.min_model_size", "3",  # Reduce minimum model size (default is 10)
+            "--Mapper.init_min_num_inliers", "15",  # Reduce minimum inliers for initialization
+            "--Mapper.abs_pose_min_num_inliers", "7",  # Lower threshold for adding images
+            "--Mapper.abs_pose_min_inlier_ratio", "0.25",  # Lower ratio threshold
+            "--Mapper.ba_global_max_num_iterations", "50",  # More bundle adjustment iterations
+            "--Mapper.ba_global_max_refinements", "5",  # More refinement iterations
+            "--Mapper.ba_local_max_num_iterations", "30",  # More local BA iterations
+            "--Mapper.init_max_reg_trials", "5",  # Try more registration trials for initialization
+            "--Mapper.min_focal_length_ratio", "0.1",  # More permissive focal length
+            "--Mapper.max_focal_length_ratio", "10.0",  # More permissive focal length
+            "--Mapper.max_extra_param", "1.0"  # More permissive distortion parameters
+        ]
+        
+        logger.info(f"Running command: {' '.join(mapper_cmd)}")
+        mapper_process = subprocess.run(
+            mapper_cmd, 
+            env=my_env, 
+            check=True,
+            capture_output=True,
+            text=True
+        )
+        
+        logger.info(f"Mapper stdout: {mapper_process.stdout}")
+        if mapper_process.stderr:
+            logger.warning(f"Mapper stderr: {mapper_process.stderr}")
+        
+        # Check if the sparse reconstruction was successful
+        sparse_model_dir = os.path.join(sparse_dir, "0")
+        if not os.path.exists(sparse_model_dir):
+            raise Exception("Sparse reconstruction failed to produce valid output")
+        
+        # Step 4: Convert COLMAP model to NeRF format
+        update_job_status(job_id, "processing", 70, "Converting camera parameters for NeRF...")
+        logger.info(f"Converting COLMAP output to NeRF format for job {job_id}")
+        
+        transforms_json_path = os.path.join(job_dir, "transforms.json")
+        success = convert_colmap_to_transforms(sparse_model_dir, image_dir, transforms_json_path)
+        
+        if not success:
+            raise Exception("Failed to convert COLMAP output to NeRF format")
+        
+        # Create a copy of transforms.json in the images directory for Nerfstudio
+        image_transforms_path = os.path.join(image_dir, "transforms.json")
+        
+        if os.path.exists(image_transforms_path):
+            os.remove(image_transforms_path)
+            
+        shutil.copy(transforms_json_path, image_transforms_path)
+        
+        logger.info(f"Created transforms.json for job {job_id}")
+        update_job_status(job_id, "processing", 80, "Camera positions estimated successfully")
+        
+        return True
+    
+    except subprocess.CalledProcessError as e:
+        logger.error(f"COLMAP command failed for job {job_id}: {str(e)}")
+        logger.error(f"STDOUT: {e.stdout if hasattr(e, 'stdout') else None}")
+        logger.error(f"STDERR: {e.stderr if hasattr(e, 'stderr') else None}")
+        update_job_status(job_id, "error", 0, f"Failed to estimate camera positions: {str(e)}")
+        return False
+    
+    except Exception as e:
+        logger.error(f"Error in processing job {job_id}: {str(e)}")
+        update_job_status(job_id, "error", 0, f"Processing error: {str(e)}")
+        return False
+
+def train_nerf(job_id, job_dir, image_dir):
+    """Train a NeRF model using Nerfstudio with GPU"""
+    try:
+        update_job_status(job_id, "processing", 85, "Training 3D model (NeRF)...")
         logger.info(f"Starting NeRF training for job {job_id}")
-        update_job_status(job_id, "processing", 40, "Training 3D model (NeRF)...")
         
-        # Prepare Nerfstudio command
-        nerf_output_dir = job_dir / "nerf"
-        ensure_dir(nerf_output_dir)
+        # Create output directory for NeRF
+        nerf_dir = os.path.join(job_dir, "nerf")
+        os.makedirs(nerf_dir, exist_ok=True)
         
-        # Configuration for instant-ngp, which is faster than original NeRF
-        nerf_cmd = [
+        # Check if transforms.json exists
+        transforms_json_path = os.path.join(image_dir, "transforms.json")
+        if not os.path.exists(transforms_json_path):
+            raise Exception(f"transforms.json not found at {transforms_json_path}")
+        
+        # Set environment variables for GPU
+        my_env = os.environ.copy()
+        my_env["CUDA_VISIBLE_DEVICES"] = "0"
+        
+        # Run Nerfstudio training - this still uses GPU
+        train_cmd = [
             "ns-train", "instant-ngp",
-            "--data", str(image_dir),
-            "--output-dir", str(nerf_output_dir),
+            "--data", image_dir,
+            "--output-dir", nerf_dir,
             "--timestamp", job_id,
-            "--max-num-iterations", "5000",  # Limit iterations for faster results
+            "--max-num-iterations", "5000",
             "--pipeline.model.background-color", "white"
         ]
         
-        try:
-            subprocess.run(nerf_cmd, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-            logger.info(f"NeRF training finished for job {job_id}")
-            update_job_status(job_id, "processing", 70, "3D model trained successfully")
-        except subprocess.CalledProcessError as e:
-            logger.error(f"NeRF training failed for job {job_id}: {e}")
-            logger.error(f"STDOUT: {e.stdout.decode() if e.stdout else 'None'}")
-            logger.error(f"STDERR: {e.stderr.decode() if e.stderr else 'None'}")
-            update_job_status(job_id, "error", 0, "Failed to train 3D model")
-            return
-            
-        # Step 3: Export model to glTF format
-        logger.info(f"Exporting model for job {job_id}")
-        update_job_status(job_id, "processing", 80, "Exporting 3D model...")
+        logger.info(f"Running Nerfstudio command: {' '.join(train_cmd)}")
         
-        # Path to the trained model
-        model_path = list(nerf_output_dir.glob(f"{job_id}/nerfstudio_models/*.ckpt"))[0]
-        export_dir = job_dir / "export"
-        ensure_dir(export_dir)
+        train_process = subprocess.run(
+            train_cmd,
+            env=my_env,
+            check=True,
+            capture_output=True,
+            text=True
+        )
         
-        # Export command
-        export_cmd = [
-            "ns-export", "gltf",
-            "--load-config", str(model_path),
-            "--output-dir", str(export_dir),
-            "--decimation-factor", "0.1",  # Reduce polygon count for web display
-            "--normal-method", "finite_difference"
-        ]
+        logger.info(f"NeRF training stdout: {train_process.stdout}")
+        if train_process.stderr:
+            logger.warning(f"NeRF training stderr: {train_process.stderr}")
         
-        try:
-            subprocess.run(export_cmd, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-            logger.info(f"Model export finished for job {job_id}")
-            update_job_status(job_id, "processing", 90, "3D model exported successfully")
-        except subprocess.CalledProcessError as e:
-            logger.error(f"Model export failed for job {job_id}: {e}")
-            logger.error(f"STDOUT: {e.stdout.decode() if e.stdout else 'None'}")
-            logger.error(f"STDERR: {e.stderr.decode() if e.stderr else 'None'}")
-            update_job_status(job_id, "error", 0, "Failed to export 3D model")
-            return
-            
-        # Step 4: Calculate roof measurements
-        logger.info(f"Calculating measurements for job {job_id}")
-        update_job_status(job_id, "processing", 95, "Calculating roof measurements...")
+        update_job_status(job_id, "processing", 95, "NeRF training completed")
         
-        # Model path
-        glb_model = list(export_dir.glob("*.glb"))[0]
+        # Generate output renders (future enhancement)
         
-        # Calculate roof measurements using our advanced function
-        measurements = calculate_roof_measurements(glb_model)
+        update_job_status(job_id, "complete", 100, "Processing completed successfully")
+        return True
         
-        # Save measurements to file
-        measurements_file = job_dir / "measurements.json"
-        with open(measurements_file, "w") as f:
-            json.dump(measurements, f, indent=2)
-            
-        # Update job status with model path and measurements
-        model_url = f"/api/model/{job_id}"
-        
-        with jobs_lock:
-            if job_id in active_jobs:
-                active_jobs[job_id].update({
-                    "status": "complete",
-                    "progress": 100,
-                    "message": "Processing complete",
-                    "modelUrl": model_url,
-                    "measurements": measurements,
-                    "completedAt": datetime.now().isoformat()
-                })
-                
-        logger.info(f"Job {job_id} completed successfully")
-        
+    except subprocess.CalledProcessError as e:
+        logger.error(f"NeRF training failed for job {job_id}: {str(e)}")
+        logger.error(f"STDOUT: {e.stdout if hasattr(e, 'stdout') else None}")
+        logger.error(f"STDERR: {e.stderr if hasattr(e, 'stderr') else None}")
+        update_job_status(job_id, "error", 0, "Failed to train 3D model")
+        return False
+    
     except Exception as e:
-        logger.error(f"Error processing images for job {job_id}: {e}", exc_info=True)
-        update_job_status(job_id, "error", 0, f"Processing error: {str(e)}")
+        logger.error(f"Error in NeRF training for job {job_id}: {str(e)}")
+        update_job_status(job_id, "error", 0, f"NeRF training error: {str(e)}")
+        return False
 
-def simplified_process_images(job_id, image_dir):
-    """
-    Simplified version that skips the actual 3D processing
-    but provides a mock response for testing the API
-    """
+def process_images(job_id):
+    """Process uploaded images with COLMAP and NeRF"""
     try:
-        update_job_status(job_id, "processing", 5, "Starting simplified processing...")
+        # Create job directory structure
+        job_dir = os.path.join(RESULTS_FOLDER, job_id)
+        os.makedirs(job_dir, exist_ok=True)
         
-        # Make necessary directories
-        job_dir = RESULTS_DIR / job_id
-        ensure_dir(job_dir)
+        image_dir = os.path.join(UPLOAD_FOLDER, job_id)
         
-        # Simulate processing with delays
-        time.sleep(2)
-        update_job_status(job_id, "processing", 30, "Analyzing camera positions...")
+        update_job_status(job_id, "processing", 5, "Starting image processing...")
         
-        time.sleep(2)
-        update_job_status(job_id, "processing", 60, "Building 3D model...")
+        # Run COLMAP to estimate camera positions with optimized parameters
+        logger.info(f"Starting COLMAP for job {job_id}")
+        update_job_status(job_id, "processing", 10, "Running COLMAP for camera position estimation...")
         
-        time.sleep(2)
-        update_job_status(job_id, "processing", 90, "Calculating measurements...")
+        colmap_success = run_colmap_pipeline(job_id, job_dir, image_dir)
         
-        # Create mock measurements
-        measurements = {
-            "area": {
-                "total": 2430,
-                "unit": "sq_ft",
-                "sections": [
-                    {"id": 0, "area": 1500, "pitch": "6/12", "degrees": 26.6},
-                    {"id": 1, "area": 930, "pitch": "4/12", "degrees": 18.4}
-                ]
-            },
-            "pitch": {
-                "primary": "6/12",
-                "degrees": 26.6,
-                "all": [
-                    {"pitch": "6/12", "degrees": 26.6},
-                    {"pitch": "4/12", "degrees": 18.4}
-                ]
-            },
-            "dimensions": {
-                "length": 65,
-                "width": 45,
-                "height": 18
-            },
-            "features": {
-                "chimneys": 1,
-                "vents": 3,
-                "skylights": 0,
-                "total_features": 4
-            },
-            "accuracy": {
-                "estimated_error_margin": "±15%",
-                "confidence": "medium",
-                "note": "Mock data for testing"
-            }
-        }
+        if not colmap_success:
+            return
         
-        # Save measurements to file
-        measurements_file = job_dir / "measurements.json"
-        with open(measurements_file, "w") as f:
-            json.dump(measurements, f, indent=2)
-            
-        # Create a placeholder model URL
-        model_url = f"/api/model/{job_id}"
+        # Run NeRF training
+        nerf_success = train_nerf(job_id, job_dir, image_dir)
         
-        # Update job status with model path and measurements
-        with jobs_lock:
-            if job_id in active_jobs:
-                active_jobs[job_id].update({
-                    "status": "complete",
-                    "progress": 100,
-                    "message": "Processing complete (simplified mode)",
-                    "modelUrl": model_url,
-                    "measurements": measurements,
-                    "completedAt": datetime.now().isoformat(),
-                    "note": "Running in simplified mode without 3D model generation"
-                })
-                
-        logger.info(f"Job {job_id} completed in simplified mode")
+        if not nerf_success:
+            return
+        
+        # If we reach here, everything was successful
+        update_job_status(job_id, "complete", 100, "Processing completed successfully")
         
     except Exception as e:
-        logger.error(f"Error in simplified processing for job {job_id}: {e}", exc_info=True)
+        logger.error(f"Error processing job {job_id}: {str(e)}")
         update_job_status(job_id, "error", 0, f"Processing error: {str(e)}")
-
-def update_job_status(job_id, status, progress, message):
-    """Update the status of a job in the active_jobs dictionary"""
-    with jobs_lock:
-        if job_id in active_jobs:
-            active_jobs[job_id].update({
-                "status": status,
-                "progress": progress,
-                "message": message,
-                "updatedAt": datetime.now().isoformat()
-            })
-            logger.info(f"Job {job_id} status updated: {status}, {progress}%, {message}")
 
 @app.route('/api/status', methods=['GET'])
-def api_status():
-    """Check if the server is running and ready"""
+def get_api_status():
     return jsonify({
         "service": "NeRF Roof Processing API",
         "status": "online",
@@ -626,275 +543,92 @@ def api_status():
 
 @app.route('/api/process', methods=['POST'])
 def process_roof_images():
-    """
-    Process uploaded images to create a 3D model
-    Expects multiple image files in the request
-    """
+    """Handle image uploads and start processing"""
     logger.info("Received upload request")
     
-    try:
-        # Check if files were uploaded
-        if 'images' not in request.files:
-            logger.warning("No images field in request")
-            return jsonify({
-                "status": "error",
-                "message": "No images uploaded"
-            }), 400
-            
-        files = request.files.getlist('images')
-        logger.info(f"Received {len(files)} files")
-        
-        if len(files) < 3:
-            return jsonify({
-                "status": "error",
-                "message": "At least 3 images are required for 3D reconstruction"
-            }), 400
-            
-        # Create a unique job ID
-        job_id = str(uuid.uuid4())
-        
-        # Create directories for this job
-        job_upload_dir = UPLOADS_DIR / job_id
-        ensure_dir(job_upload_dir)
-        
-        # Save uploaded images
-        file_count = 0
-        for file in files:
-            if file.filename == '':
-                continue
-                
-            # Check if the file is a valid image
-            if not file.filename.lower().endswith(('.png', '.jpg', '.jpeg')):
-                continue
-                
-            # Save the file
-            file_path = job_upload_dir / file.filename
+    # Check if files are in the request
+    if 'images' not in request.files:
+        return jsonify({"error": "No images found in request"}), 400
+    
+    files = request.files.getlist('images')
+    if len(files) == 0:
+        return jsonify({"error": "No selected files"}), 400
+    
+    if len(files) > MAX_IMAGES:
+        return jsonify({"error": f"Too many images. Maximum allowed: {MAX_IMAGES}"}), 400
+    
+    # Generate unique job ID
+    job_id = str(uuid.uuid4())
+    
+    # Create directory for this job
+    job_upload_dir = os.path.join(UPLOAD_FOLDER, job_id)
+    os.makedirs(job_upload_dir, exist_ok=True)
+    
+    # Save uploaded files
+    saved_files = []
+    for file in files:
+        if file and allowed_file(file.filename):
+            safe_filename = str(uuid.uuid4()) + "." + file.filename.rsplit('.', 1)[1].lower()
+            file_path = os.path.join(job_upload_dir, safe_filename)
             file.save(file_path)
-            file_count += 1
-            
-        if file_count < 3:
-            # Clean up
-            shutil.rmtree(job_upload_dir)
-            
-            return jsonify({
-                "status": "error",
-                "message": f"Not enough valid images: {file_count} saved, at least 3 required"
-            }), 400
-            
-        # Create job entry
-        with jobs_lock:
-            active_jobs[job_id] = {
-                "id": job_id,
-                "status": "uploading",
-                "progress": 0,
-                "message": "Images uploaded, preparing for processing",
-                "createdAt": datetime.now().isoformat(),
-                "updatedAt": datetime.now().isoformat(),
-                "imageCount": file_count
-            }
-            
-        # Start processing in a separate thread - using FULL PROCESSING mode
-        processing_thread = threading.Thread(
-            target=process_images,  # Using full 3D processing
-            args=(job_id, job_upload_dir)
-        )
-        processing_thread.daemon = True
-        processing_thread.start()
-        
-        return jsonify({
-            "status": "success",
-            "message": "Images uploaded successfully",
-            "jobId": job_id,
-            "imageCount": file_count
-        })
-        
-    except Exception as e:
-        logger.error(f"Error processing upload: {e}", exc_info=True)
-        return jsonify({
-            "status": "error",
-            "message": f"Server error: {str(e)}"
-        }), 500
+            saved_files.append(file_path)
+    
+    logger.info(f"Received {len(saved_files)} files")
+    
+    # Initialize job in our database
+    update_job_status(job_id, "queued", 0, "Job received and queued for processing")
+    jobs[job_id]["imageCount"] = len(saved_files)
+    
+    # Start processing in a separate thread
+    thread = threading.Thread(target=process_images, args=(job_id,))
+    thread.daemon = True
+    thread.start()
+    
+    # Return job ID to client
+    return jsonify({
+        "jobId": job_id,
+        "status": "queued",
+        "message": "Images received and queued for processing"
+    })
 
 @app.route('/api/job/<job_id>', methods=['GET'])
 def get_job_status(job_id):
-    """Get the status of a specific job"""
-    with jobs_lock:
-        if job_id not in active_jobs:
-            return jsonify({
-                "status": "error",
-                "message": "Job not found"
-            }), 404
-            
-        job_info = active_jobs[job_id].copy()
-        
-    return jsonify(job_info)
+    """Check status of a job"""
+    if job_id not in jobs:
+        return jsonify({"error": "Job not found"}), 404
+    
+    return jsonify(jobs[job_id])
 
 @app.route('/api/model/<job_id>', methods=['GET'])
 def get_model(job_id):
-    """
-    Get the 3D model and measurements for a completed job
-    Returns the model file or JSON with model URL and measurements
-    """
-    # Format parameter determines what to return
-    format_param = request.args.get('format', 'json')
+    """Retrieve the processed 3D model for a job"""
+    if job_id not in jobs:
+        return jsonify({"error": "Job not found"}), 404
     
-    with jobs_lock:
-        if job_id not in active_jobs:
-            return jsonify({
-                "status": "error",
-                "message": "Job not found"
-            }), 404
-            
-        job_info = active_jobs[job_id].copy()
-        
-    if job_info['status'] != 'complete':
-        return jsonify({
-            "status": "error",
-            "message": f"Job is not complete: {job_info['status']}"
-        }), 400
-        
-    # Look for the model file
-    job_dir = RESULTS_DIR / job_id
-    export_dir = job_dir / "export"
+    if jobs[job_id]["status"] != "complete":
+        return jsonify({"error": "Model not ready yet"}), 400
     
-    # For simplified mode, we won't have a real model file
-    if "note" in job_info and "simplified mode" in job_info["note"]:
-        # Return mock data
-        measurements_file = job_dir / "measurements.json"
-        if measurements_file.exists():
-            with open(measurements_file, "r") as f:
-                measurements = json.load(f)
-        else:
-            measurements = job_info.get("measurements", {})
-            
-        # Generate URLs for frontend
-        model_url = f"/api/model/{job_id}?format=glb"
-        
-        return jsonify({
-            "status": "success",
-            "jobId": job_id,
-            "modelUrl": model_url,
-            "measurements": measurements,
-            "note": "Running in simplified mode without 3D model generation"
-        })
-        
-    # For full mode, check for the actual GLB file
-    glb_files = list(export_dir.glob("*.glb"))
-    if not glb_files:
-        return jsonify({
-            "status": "error",
-            "message": "Model file not found"
-        }), 404
-        
-    glb_model = glb_files[0]
-    
-    # Get measurements
-    measurements_file = job_dir / "measurements.json"
-    if measurements_file.exists():
-        with open(measurements_file, "r") as f:
-            measurements = json.load(f)
-    else:
-        measurements = None
-        
-    # Return the model file or model info
-    if format_param == 'glb':
-        return send_file(
-            glb_model,
-            mimetype='model/gltf-binary',
-            as_attachment=True,
-            download_name=f"roof_model_{job_id}.glb"
-        )
-    else:
-        # Generate URLs for frontend
-        model_url = f"/api/model/{job_id}?format=glb"
-        
-        return jsonify({
-            "status": "success",
-            "jobId": job_id,
-            "modelUrl": model_url,
-            "measurements": measurements
-        })
-
-@app.route('/api/jobs', methods=['GET'])
-def list_jobs():
-    """List all active jobs (admin endpoint)"""
-    # Simple API key check for admin endpoints
-    api_key = request.args.get('key')
-    if api_key != os.environ.get('ADMIN_API_KEY'):
-        return jsonify({
-            "status": "error",
-            "message": "Unauthorized"
-        }), 401
-        
-    with jobs_lock:
-        job_list = list(active_jobs.values())
-        
+    # In a real implementation, this would serve the actual 3D model file
+    # For this example, we'll return a mock response
     return jsonify({
-        "status": "success",
-        "count": len(job_list),
-        "jobs": job_list
+        "jobId": job_id,
+        "modelUrl": f"/api/files/{job_id}/model.glb"
     })
 
-@app.route('/api/cleanup', methods=['POST'])
-def cleanup_old_jobs():
-    """Clean up old jobs (admin endpoint)"""
-    # Simple API key check for admin endpoints
-    api_key = request.args.get('key')
-    if api_key != os.environ.get('ADMIN_API_KEY'):
-        return jsonify({
-            "status": "error",
-            "message": "Unauthorized"
-        }), 401
-        
-    # Get days parameter (default: 7 days)
-    days = int(request.args.get('days', 7))
+@app.route('/api/files/<job_id>/<filename>', methods=['GET'])
+def get_job_file(job_id, filename):
+    """Serve files from the job results directory"""
+    job_dir = os.path.join(RESULTS_FOLDER, job_id)
     
-    # Calculate cutoff time
-    cutoff = datetime.now().timestamp() - (days * 86400)
+    if not os.path.exists(job_dir):
+        return jsonify({"error": "Job not found"}), 404
     
-    cleaned_jobs = []
-    
-    with jobs_lock:
-        for job_id, job_info in list(active_jobs.items()):
-            # Check if job is old enough to clean up
-            created_at = datetime.fromisoformat(job_info['createdAt'])
-            if created_at.timestamp() < cutoff:
-                # Remove job data
-                try:
-                    job_upload_dir = UPLOADS_DIR / job_id
-                    job_result_dir = RESULTS_DIR / job_id
-                    
-                    if job_upload_dir.exists():
-                        shutil.rmtree(job_upload_dir)
-                        
-                    if job_result_dir.exists():
-                        shutil.rmtree(job_result_dir)
-                        
-                    # Remove from active jobs
-                    del active_jobs[job_id]
-                    cleaned_jobs.append(job_id)
-                    
-                except Exception as e:
-                    logger.error(f"Error cleaning up job {job_id}: {e}")
-    
-    return jsonify({
-        "status": "success",
-        "message": f"Cleaned up {len(cleaned_jobs)} old jobs",
-        "cleanedJobs": cleaned_jobs
-    })
+    return send_from_directory(job_dir, filename)
+
+# Main route
+@app.route('/', methods=['GET'])
+def index():
+    return "NeRF Roof Processing API - Use /api/process to upload images"
 
 if __name__ == '__main__':
-    # Check for all required dependencies
-    try:
-        import trimesh
-        import numpy as np
-        from sklearn.cluster import DBSCAN
-        logger.info("Required libraries for measurement installed")
-    except ImportError as e:
-        logger.warning(f"Some libraries are missing: {e}. Measurements may not be accurate.")
-    
-    logger.info("Starting 3D Roof Analysis API server")
-    
-    # Get port from environment or use default
-    port = int(os.environ.get('PORT', 5001))
-    app.run(host='0.0.0.0', port=port, debug=False)
+    app.run(host='0.0.0.0', port=5002, debug=False)
