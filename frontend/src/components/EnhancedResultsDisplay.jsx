@@ -31,65 +31,81 @@ const EnhancedResultsDisplay = ({ results }) => {
     );
   }
   
-  // Extract structured data from API response
+  // Enhanced function to extract structured data from API response
   function extractStructuredData(apiResponse) {
     try {
-      console.log("Extracting from:", apiResponse);
-      
-      // Check if apiResponse already contains the parsed data
-      if (apiResponse.specifications) {
-        return apiResponse.specifications;
-      }
+      console.log("Extracting from API response");
       
       // Extract from raw API response
       if (apiResponse.choices && apiResponse.choices[0] && apiResponse.choices[0].message) {
         const content = apiResponse.choices[0].message.content;
-        console.log("Processing content:", content.substring(0, 100));
         
-        // Handle response with code blocks (like ```json...```)
+        // Check if content starts with code block marker
         if (content.includes('```json')) {
-          const jsonMatch = content.match(/```json\s*([\s\S]*?)\s*```/);
+          console.log("Found JSON code block");
+          // Extract content between code block markers
+          const jsonMatch = content.match(/```json\s*([\s\S]*?)(\s*```|$)/);
+          
           if (jsonMatch && jsonMatch[1]) {
             try {
-              const parsed = JSON.parse(jsonMatch[1].trim());
-              console.log("Found JSON in code block:", Object.keys(parsed));
-              return parsed;
+              // Fix potentially truncated JSON
+              let jsonStr = jsonMatch[1];
+              
+              // Attempt to parse the JSON
+              try {
+                const parsed = JSON.parse(jsonStr);
+                console.log("Successfully parsed JSON from code block");
+                return parsed;
+              } catch (e) {
+                // If parsing fails, it might be truncated
+                console.log("Initial parsing failed, trying to fix truncated JSON");
+                
+                // Try to find the last complete object by finding the last closing brace with matching opening
+                let depth = 0;
+                let lastCompleteIndex = -1;
+                
+                for (let i = 0; i < jsonStr.length; i++) {
+                  if (jsonStr[i] === '{') depth++;
+                  else if (jsonStr[i] === '}') {
+                    depth--;
+                    if (depth === 0) lastCompleteIndex = i;
+                  }
+                }
+                
+                if (lastCompleteIndex > 0) {
+                  jsonStr = jsonStr.substring(0, lastCompleteIndex + 1);
+                  try {
+                    const parsed = JSON.parse(jsonStr);
+                    console.log("Successfully parsed fixed JSON");
+                    return parsed;
+                  } catch (e) {
+                    console.error("Still failed to parse JSON after fixing", e);
+                  }
+                }
+              }
             } catch (e) {
-              console.error("Failed to parse JSON from code block:", e);
+              console.error("Error processing JSON from code block:", e);
             }
           }
         }
         
-        // Try to find JSON in the content
+        // Try to find JSON directly in the content
         const jsonMatch = content.match(/\{[\s\S]*\}/);
         if (jsonMatch) {
           try {
             const parsed = JSON.parse(jsonMatch[0]);
-            console.log("Found JSON in content:", Object.keys(parsed));
+            console.log("Found and parsed direct JSON in content");
             return parsed;
           } catch (e) {
-            console.error("Failed to parse JSON from match:", e);
+            console.error("Failed to parse direct JSON:", e);
           }
         }
-        
-        // Try to parse the whole content
-        try {
-          const parsed = JSON.parse(content);
-          console.log("Parsed whole content as JSON:", Object.keys(parsed));
-          return parsed;
-        } catch (e) {
-          console.error("Failed to parse whole content as JSON:", e);
-        }
-        
-        // If we get here, we couldn't parse as JSON - try looking for structured text
-        console.log("Looking for structured text");
-        return null;
       }
       
-      console.log("No message content found in API response");
+      console.log("Could not extract structured data from API response");
       return null;
     } catch (error) {
-      console.error("Error extracting data:", error);
+      console.error("Error in extractStructuredData:", error);
       return null;
     }
   }
@@ -101,10 +117,26 @@ const EnhancedResultsDisplay = ({ results }) => {
     if (severity <= 8) return '#FF9800'; // Orange
     return 'var(--danger)';
   };
+  
+  // Helper function to safely get property allowing for different naming conventions
+  const getProp = (obj, propName, defaultValue = 'Unknown') => {
+    // Check for the property directly
+    if (obj[propName] !== undefined && obj[propName] !== null) {
+      return obj[propName];
+    }
+    
+    // Check for uppercase version (MATERIAL SPECIFICATION vs materialSpecification)
+    const uppercaseProp = propName.toUpperCase().replace(/([A-Z])/g, ' $1').trim();
+    if (obj[uppercaseProp] !== undefined && obj[uppercaseProp] !== null) {
+      return obj[uppercaseProp];
+    }
+    
+    return defaultValue;
+  };
 
   // Render specifications tab
   const renderSpecifications = () => {
-    const materialSpec = parsedData["MATERIAL_SPECIFICATION"] || {};
+    const materialSpec = parsedData["MATERIAL_SPECIFICATION"] || parsedData.materialSpecification || {};
     console.log("Material specs:", materialSpec);
     
     // Handle manufacturer as string or array
@@ -252,7 +284,7 @@ const EnhancedResultsDisplay = ({ results }) => {
 
   // Render damage assessment tab
   const renderDamageAssessment = () => {
-    const damageAssessment = parsedData["DAMAGE_ASSESSMENT"] || {};
+    const damageAssessment = parsedData["DAMAGE_ASSESSMENT"] || parsedData.damageAssessment || {};
     console.log("Damage assessment:", damageAssessment);
     
     // Parse damage types
@@ -372,7 +404,7 @@ const EnhancedResultsDisplay = ({ results }) => {
 
   // Render repair assessment tab
   const renderRepairAssessment = () => {
-    const repairAssessment = parsedData["REPAIR_ASSESSMENT"] || {};
+    const repairAssessment = parsedData["REPAIR_ASSESSMENT"] || parsedData.repairAssessment || {};
     console.log("Repair assessment:", repairAssessment);
     
     // Parse special considerations
@@ -435,7 +467,7 @@ const EnhancedResultsDisplay = ({ results }) => {
 
   // Render metadata tab
   const renderMetadata = () => {
-    const metadata = parsedData["METADATA"] || {};
+    const metadata = parsedData["METADATA"] || parsedData.metadata || {};
     console.log("Metadata:", metadata);
     
     // Parse visibility estimate
