@@ -6,45 +6,47 @@ const EnhancedResultsDisplay = ({ results }) => {
   const [activeTab, setActiveTab] = useState('specifications');
   
   // Early return if no results
-  if (!results || !results.choices || !results.choices[0] || !results.choices[0].message) {
+  if (!results) {
     return <div className="no-results">No analysis results available</div>;
   }
   
-  // Extract data from the OpenAI response
-  let analysisData;
-  try {
-    // Handle different possible response structures
-    if (results.parsedResults) {
-      // If the backend already parsed the JSON
-      analysisData = results.parsedResults;
-    } else {
-      // Try to parse JSON from the content
-      const content = results.choices[0].message.content;
-      // Look for JSON in the content
-      const jsonMatch = content.match(/\{[\s\S]*\}/);
-      if (jsonMatch) {
-        analysisData = JSON.parse(jsonMatch[0]);
-      } else {
-        // Fallback to parsing the whole content
+  // Extract data from the response
+  const extractStructuredData = () => {
+    try {
+      // If the data has already been processed by ShingleAnalyzer component
+      if (results.specifications) {
+        return results.specifications;
+      }
+      
+      // Try to parse from the OpenAI API response
+      if (results.choices && results.choices[0] && results.choices[0].message) {
+        const content = results.choices[0].message.content;
+        
+        // Try to extract JSON
+        const jsonMatch = content.match(/\{[\s\S]*\}/);
+        if (jsonMatch) {
+          return JSON.parse(jsonMatch[0]);
+        }
+        
+        // Try to parse the whole content
         try {
-          analysisData = JSON.parse(content);
+          return JSON.parse(content);
         } catch (e) {
-          // If we can't parse, create a basic structure to display the raw text
-          analysisData = {
-            rawText: content,
-            materialSpecification: {},
-            damageAssessment: { 
-              damageTypes: [],
-              overallCondition: "Unknown"
-            },
-            repairAssessment: {},
-            metadata: {}
-          };
+          console.warn("Unable to parse content as JSON");
         }
       }
+      
+      return null;
+    } catch (error) {
+      console.error("Error extracting data:", error);
+      return null;
     }
-  } catch (error) {
-    console.error("Error parsing results:", error);
+  };
+  
+  const data = extractStructuredData();
+  
+  // If we couldn't extract structured data
+  if (!data) {
     return (
       <div className="error-parsing">
         <h3>Error Parsing Results</h3>
@@ -53,10 +55,42 @@ const EnhancedResultsDisplay = ({ results }) => {
       </div>
     );
   }
-
+  
+  // Helper function to safely access nested properties
+  const get = (obj, path, defaultValue = 'Unknown') => {
+    const keys = Array.isArray(path) ? path : path.split('.');
+    let result = obj;
+    
+    for (const key of keys) {
+      if (result === null || result === undefined || typeof result !== 'object') {
+        return defaultValue;
+      }
+      result = result[key];
+    }
+    
+    return result !== null && result !== undefined ? result : defaultValue;
+  };
+  
+  // Extract each section of data
+  const materialSpec = data['MATERIAL SPECIFICATION'] || data.materialSpecification || {};
+  const damageAssessment = data['DAMAGE ASSESSMENT'] || data.damageAssessment || {};
+  const repairAssessment = data['REPAIR ASSESSMENT'] || data.repairAssessment || {};
+  const metadata = data['METADATA'] || data.metadata || {};
+  
   // Helper function to render damage type details
   const renderDamageType = (type, data) => {
     if (!data || !data.present) return null;
+    
+    // Parse coverage from string to number if needed
+    let coverageValue = data.coverage;
+    if (typeof coverageValue === 'string') {
+      const match = coverageValue.match(/(\d+)/);
+      if (match) {
+        coverageValue = parseInt(match[1], 10);
+      } else {
+        coverageValue = 0;
+      }
+    }
     
     return (
       <div className={`damage-type-item ${data.severity > 5 ? 'severe' : 'moderate'}`}>
@@ -72,9 +106,9 @@ const EnhancedResultsDisplay = ({ results }) => {
           <div className="coverage-bar-container">
             <div 
               className="coverage-bar" 
-              style={{ width: `${data.coverage}%` }}
+              style={{ width: `${coverageValue}%` }}
             />
-            <div className="coverage-percentage">{data.coverage}%</div>
+            <div className="coverage-percentage">{coverageValue}%</div>
           </div>
         </div>
       </div>
@@ -83,22 +117,32 @@ const EnhancedResultsDisplay = ({ results }) => {
 
   // Render functions for each tab
   const renderSpecifications = () => {
-    const specs = analysisData.materialSpecification || {};
+    // Handle manufacturer as string or array
+    let manufacturerValue = materialSpec.manufacturer;
+    if (Array.isArray(manufacturerValue)) {
+      manufacturerValue = manufacturerValue.join(', ');
+    }
+    
+    // Handle colors as string or array
+    let colorsArray = materialSpec.colors || [];
+    if (!Array.isArray(colorsArray)) {
+      colorsArray = [colorsArray];
+    }
     
     return (
       <div className="specifications-container">
         <div className="material-overview">
-          <h3 className="material-name">{specs.name || "Unknown Material"}</h3>
-          {specs.manufacturer && (
+          <h3 className="material-name">{materialSpec.name || "Unknown Material"}</h3>
+          {manufacturerValue && (
             <div className="manufacturer">
               <span className="manufacturer-label">Manufacturer:</span>
-              <span className="manufacturer-value">{specs.manufacturer}</span>
+              <span className="manufacturer-value">{manufacturerValue}</span>
             </div>
           )}
-          {specs.productLine && (
+          {materialSpec.productLine && (
             <div className="product-line">
               <span className="product-line-label">Product Line:</span>
-              <span className="product-line-value">{specs.productLine}</span>
+              <span className="product-line-value">{materialSpec.productLine}</span>
             </div>
           )}
         </div>
@@ -107,67 +151,67 @@ const EnhancedResultsDisplay = ({ results }) => {
           {/* Material Details */}
           <div className="spec-item">
             <span className="spec-label">Material Type</span>
-            <span className="spec-value">{specs.material || "Unknown"}</span>
+            <span className="spec-value">{materialSpec.material || "Unknown"}</span>
           </div>
           <div className="spec-item">
             <span className="spec-label">Material Subtype</span>
-            <span className="spec-value">{specs.materialSubtype || "Unknown"}</span>
+            <span className="spec-value">{materialSpec.materialSubtype || "Unknown"}</span>
           </div>
           <div className="spec-item">
             <span className="spec-label">Dimensions</span>
-            <span className="spec-value">{specs.dimensions || "Unknown"}</span>
+            <span className="spec-value">{materialSpec.dimensions || "Unknown"}</span>
           </div>
           <div className="spec-item">
             <span className="spec-label">Thickness</span>
-            <span className="spec-value">{specs.thickness || "Unknown"}</span>
+            <span className="spec-value">{materialSpec.thickness || "Unknown"}</span>
           </div>
           <div className="spec-item">
             <span className="spec-label">Weight</span>
-            <span className="spec-value">{specs.weight || "Unknown"}</span>
+            <span className="spec-value">{materialSpec.weight || "Unknown"}</span>
           </div>
           <div className="spec-item">
             <span className="spec-label">Pattern</span>
-            <span className="spec-value">{specs.pattern || "Unknown"}</span>
+            <span className="spec-value">{materialSpec.pattern || "Unknown"}</span>
           </div>
           
           {/* Age & Lifespan */}
           <div className="spec-item">
             <span className="spec-label">Estimated Age</span>
-            <span className="spec-value">{specs.estimatedAge || "Unknown"}</span>
+            <span className="spec-value">{materialSpec.estimatedAge || "Unknown"}</span>
           </div>
           <div className="spec-item">
             <span className="spec-label">Expected Lifespan</span>
-            <span className="spec-value">{specs.lifespan || "Unknown"}</span>
+            <span className="spec-value">{materialSpec.lifespan || "Unknown"}</span>
           </div>
           <div className="spec-item">
             <span className="spec-label">Warranty</span>
-            <span className="spec-value">{specs.warranty || "Unknown"}</span>
+            <span className="spec-value">{materialSpec.warranty || "Unknown"}</span>
           </div>
           
           {/* Performance Ratings */}
           <div className="spec-item">
             <span className="spec-label">Fire Rating</span>
-            <span className="spec-value">{specs.fireRating || "Unknown"}</span>
+            <span className="spec-value">{materialSpec.fireRating || "Unknown"}</span>
           </div>
           <div className="spec-item">
             <span className="spec-label">Wind Rating</span>
-            <span className="spec-value">{specs.windRating || "Unknown"}</span>
+            <span className="spec-value">{materialSpec.windRating || "Unknown"}</span>
           </div>
           <div className="spec-item">
             <span className="spec-label">Impact Resistance</span>
-            <span className="spec-value">{specs.impactResistance || "Unknown"}</span>
+            <span className="spec-value">{materialSpec.impactResistance || "Unknown"}</span>
           </div>
           <div className="spec-item">
             <span className="spec-label">Energy Efficiency</span>
-            <span className="spec-value">{specs.energyEfficiency || "Unknown"}</span>
+            <span className="spec-value">{materialSpec.energyEfficiency || "Unknown"}</span>
           </div>
           
           {/* Colors */}
-          {specs.colors && specs.colors.length > 0 && (
+          {colorsArray && colorsArray.length > 0 && (
             <div className="spec-item colors-item">
               <span className="spec-label">Colors</span>
               <div className="colors-container">
-                {specs.colors.map((color, index) => (
+                {colorsArray.map((color, index) => (
                   <span key={index} className="color-tag">{color}</span>
                 ))}
               </div>
@@ -179,14 +223,18 @@ const EnhancedResultsDisplay = ({ results }) => {
   };
 
   const renderDamageAssessment = () => {
-    const damage = analysisData.damageAssessment || {};
+    // Parse damage types
+    let damageTypes = damageAssessment.damageTypes || [];
+    if (!Array.isArray(damageTypes)) {
+      damageTypes = [damageTypes];
+    }
     
     return (
       <div className="damage-assessment-container">
         <div className="damage-summary">
-          <div className={`condition-indicator condition-${(damage.overallCondition || "").toLowerCase()}`}>
+          <div className={`condition-indicator condition-${(damageAssessment.overallCondition || "").toLowerCase()}`}>
             <span className="condition-label">Condition:</span>
-            <span className="condition-value">{damage.overallCondition || "Unknown"}</span>
+            <span className="condition-value">{damageAssessment.overallCondition || "Unknown"}</span>
           </div>
           
           <div className="damage-severity">
@@ -195,28 +243,28 @@ const EnhancedResultsDisplay = ({ results }) => {
               <div 
                 className="severity-fill" 
                 style={{ 
-                  width: `${(damage.damageSeverity || 0) * 10}%`,
-                  backgroundColor: getSeverityColor(damage.damageSeverity || 0)
+                  width: `${(damageAssessment.damageSeverity || 0) * 10}%`,
+                  backgroundColor: getSeverityColor(damageAssessment.damageSeverity || 0)
                 }}
               />
-              <span className="severity-value">{damage.damageSeverity || 0}/10</span>
+              <span className="severity-value">{damageAssessment.damageSeverity || 0}/10</span>
             </div>
           </div>
           
-          {damage.damageTypes && damage.damageTypes.length > 0 && (
+          {damageTypes.length > 0 && (
             <div className="damage-types-overview">
               <span className="damage-types-label">Detected Issues:</span>
               <div className="damage-types-tags">
-                {damage.damageTypes.map((type, index) => (
+                {damageTypes.map((type, index) => (
                   <span key={index} className="damage-type-tag">{type}</span>
                 ))}
               </div>
             </div>
           )}
           
-          {damage.description && (
+          {damageAssessment.description && (
             <div className="damage-description-overview">
-              <p>{damage.description}</p>
+              <p>{damageAssessment.description}</p>
             </div>
           )}
         </div>
@@ -224,51 +272,54 @@ const EnhancedResultsDisplay = ({ results }) => {
         <div className="damage-details">
           <h3 className="damage-details-title">Detailed Damage Assessment</h3>
           
-          {renderDamageType("Granule Loss", damage.granuleLoss)}
-          {renderDamageType("Cracking", damage.cracking)}
-          {renderDamageType("Curling", damage.curling)}
-          {renderDamageType("Blistering", damage.blistering)}
-          {renderDamageType("Missing Shingles", damage.missingShingles)}
-          {renderDamageType("Hail Damage", damage.hailDamage)}
-          {renderDamageType("Water Damage", damage.waterDamage)}
-          {renderDamageType("Algae Growth", damage.algaeGrowth)}
+          {renderDamageType("Granule Loss", damageAssessment.granuleLoss)}
+          {renderDamageType("Cracking", damageAssessment.cracking)}
+          {renderDamageType("Curling", damageAssessment.curling)}
+          {renderDamageType("Blistering", damageAssessment.blistering)}
+          {renderDamageType("Missing Shingles", damageAssessment.missingShingles)}
+          {renderDamageType("Hail Damage", damageAssessment.hailDamage)}
+          {renderDamageType("Water Damage", damageAssessment.waterDamage)}
+          {renderDamageType("Algae Growth", damageAssessment.algaeGrowth)}
           
           {/* Show additional metadata if available */}
-          {damage.likelyDamageCauses && damage.likelyDamageCauses.length > 0 && (
+          {damageAssessment.likelyDamageCauses && damageAssessment.likelyDamageCauses.length > 0 && (
             <div className="damage-causes">
               <h4>Likely Causes:</h4>
               <div className="causes-container">
-                {damage.likelyDamageCauses.map((cause, index) => (
-                  <span key={index} className="cause-tag">{cause}</span>
-                ))}
+                {Array.isArray(damageAssessment.likelyDamageCauses) ? 
+                  damageAssessment.likelyDamageCauses.map((cause, index) => (
+                    <span key={index} className="cause-tag">{cause}</span>
+                  )) :
+                  <span className="cause-tag">{damageAssessment.likelyDamageCauses}</span>
+                }
               </div>
             </div>
           )}
           
-          {damage.estimatedTimeframeSinceDamage && (
+          {damageAssessment.estimatedTimeframeSinceDamage && (
             <div className="damage-timeframe">
               <span className="timeframe-label">Estimated Time Since Damage:</span>
-              <span className="timeframe-value">{damage.estimatedTimeframeSinceDamage}</span>
+              <span className="timeframe-value">{damageAssessment.estimatedTimeframeSinceDamage}</span>
             </div>
           )}
           
           {/* Additional flags */}
           <div className="damage-flags">
-            {damage.weatherRelated && (
+            {damageAssessment.weatherRelated && (
               <div className="flag-item weather-related">
                 <span className="flag-icon">🌧️</span>
                 <span className="flag-text">Weather-Related Damage</span>
               </div>
             )}
             
-            {damage.structuralConcerns && (
+            {damageAssessment.structuralConcerns && (
               <div className="flag-item structural-concerns">
                 <span className="flag-icon">⚠️</span>
                 <span className="flag-text">Structural Concerns Present</span>
               </div>
             )}
             
-            {damage.progressiveIssues && (
+            {damageAssessment.progressiveIssues && (
               <div className="flag-item progressive-issues">
                 <span className="flag-icon">📈</span>
                 <span className="flag-text">Progressive Damage (Will Worsen)</span>
@@ -276,10 +327,10 @@ const EnhancedResultsDisplay = ({ results }) => {
             )}
           </div>
           
-          {damage.recommendedAction && (
+          {damageAssessment.recommendedAction && (
             <div className="recommended-action">
               <h4>Recommended Action:</h4>
-              <p>{damage.recommendedAction}</p>
+              <p>{damageAssessment.recommendedAction}</p>
             </div>
           )}
         </div>
@@ -288,50 +339,54 @@ const EnhancedResultsDisplay = ({ results }) => {
   };
 
   const renderRepairAssessment = () => {
-    const repair = analysisData.repairAssessment || {};
+    // Parse special considerations
+    let specialConsiderations = repairAssessment.specialConsiderations || [];
+    if (!Array.isArray(specialConsiderations)) {
+      specialConsiderations = [specialConsiderations];
+    }
     
     return (
       <div className="repair-assessment-container">
         <div className="repair-summary">
-          <div className={`recommendation-indicator recommendation-${(repair.repairRecommendation || "").toLowerCase().replace(/\s+/g, '-')}`}>
+          <div className={`recommendation-indicator recommendation-${(repairAssessment.repairRecommendation || "").toLowerCase().replace(/\s+/g, '-')}`}>
             <span className="recommendation-label">Recommendation:</span>
-            <span className="recommendation-value">{repair.repairRecommendation || "Unknown"}</span>
+            <span className="recommendation-value">{repairAssessment.repairRecommendation || "Unknown"}</span>
           </div>
           
-          <div className={`urgency-indicator urgency-${(repair.urgency || "").toLowerCase()}`}>
+          <div className={`urgency-indicator urgency-${(repairAssessment.urgency || "").toLowerCase()}`}>
             <span className="urgency-label">Urgency:</span>
-            <span className="urgency-value">{repair.urgency || "Unknown"}</span>
+            <span className="urgency-value">{repairAssessment.urgency || "Unknown"}</span>
           </div>
         </div>
         
         <div className="repair-details">
           <div className="repair-difficulty">
             <span className="difficulty-label">Repair Difficulty:</span>
-            <span className="difficulty-value">{repair.repairDifficulty || "Unknown"}</span>
+            <span className="difficulty-value">{repairAssessment.repairDifficulty || "Unknown"}</span>
           </div>
           
           <div className="diy-feasibility">
             <span className="diy-label">DIY Feasible:</span>
-            <span className="diy-value">{repair.diyFeasibility ? "Yes" : "No"}</span>
+            <span className="diy-value">{repairAssessment.diyFeasibility ? "Yes" : "No"}</span>
           </div>
           
           <div className="cost-estimates">
             <div className="cost-item repair-cost">
               <span className="cost-label">Estimated Repair Cost:</span>
-              <span className="cost-value">{repair.anticipatedRepairCost || "Unknown"}</span>
+              <span className="cost-value">{repairAssessment.anticipatedRepairCost || "Unknown"}</span>
             </div>
             
             <div className="cost-item replacement-cost">
               <span className="cost-label">Estimated Replacement Cost:</span>
-              <span className="cost-value">{repair.anticipatedReplacementCost || "Unknown"}</span>
+              <span className="cost-value">{repairAssessment.anticipatedReplacementCost || "Unknown"}</span>
             </div>
           </div>
           
-          {repair.specialConsiderations && repair.specialConsiderations.length > 0 && (
+          {specialConsiderations.length > 0 && (
             <div className="special-considerations">
               <h4>Special Considerations:</h4>
               <ul className="considerations-list">
-                {repair.specialConsiderations.map((consideration, index) => (
+                {specialConsiderations.map((consideration, index) => (
                   <li key={index} className="consideration-item">{consideration}</li>
                 ))}
               </ul>
@@ -343,7 +398,11 @@ const EnhancedResultsDisplay = ({ results }) => {
   };
 
   const renderMetadata = () => {
-    const metadata = analysisData.metadata || {};
+    // Parse visibility estimate
+    let visibleSection = metadata.visibleSectionEstimate || "0%";
+    if (typeof visibleSection === 'number') {
+      visibleSection = `${visibleSection}%`;
+    }
     
     return (
       <div className="metadata-container">
@@ -367,7 +426,7 @@ const EnhancedResultsDisplay = ({ results }) => {
           
           <div className="visibility-item">
             <span className="visibility-label">Visible Roof Portion:</span>
-            <span className="visibility-value">{metadata.visibleSectionEstimate || 0}%</span>
+            <span className="visibility-value">{visibleSection}</span>
           </div>
           
           {metadata.limitationNotes && (
@@ -395,7 +454,7 @@ const EnhancedResultsDisplay = ({ results }) => {
       <div className="raw-data-container">
         <h3>Raw Analysis Data</h3>
         <div className="raw-data-code">
-          <pre>{JSON.stringify(analysisData, null, 2)}</pre>
+          <pre>{JSON.stringify(data, null, 2)}</pre>
         </div>
       </div>
     );
