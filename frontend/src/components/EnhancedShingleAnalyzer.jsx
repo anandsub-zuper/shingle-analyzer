@@ -42,6 +42,39 @@ const EnhancedShingleAnalyzer = () => {
     }
   };
 
+  // Extract structured data from API response
+  const extractStructuredData = (apiResponse) => {
+    try {
+      // If already processed
+      if (apiResponse.specifications) {
+        return apiResponse.specifications;
+      }
+      
+      // Extract from raw API response
+      if (apiResponse.choices && apiResponse.choices[0] && apiResponse.choices[0].message) {
+        const content = apiResponse.choices[0].message.content;
+        
+        // Look for JSON in content
+        const jsonMatch = content.match(/\{[\s\S]*\}/);
+        if (jsonMatch) {
+          return JSON.parse(jsonMatch[0]);
+        }
+        
+        // Try to parse whole content as JSON
+        try {
+          return JSON.parse(content);
+        } catch (e) {
+          console.warn("Could not parse content as JSON", e);
+        }
+      }
+      
+      return null;
+    } catch (error) {
+      console.error("Error extracting structured data:", error);
+      return null;
+    }
+  };
+
   // Analyze the image - matches your existing pattern for image processing
   const analyzeImage = async () => {
     if (!file) {
@@ -76,129 +109,17 @@ const EnhancedShingleAnalyzer = () => {
           const data = await response.json();
           
           if (response.ok) {
-            if (data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content) {
-              // Following your existing response handling pattern
-              const gptResponse = data.choices[0].message.content;
-              
-              try {
-                // Try to parse the response
-                let parsedResponse;
-                
-                // Handle content that might be a string representation of JSON
-                if (typeof gptResponse === 'string') {
-                  // Try to extract JSON if it's within the string
-                  const jsonMatch = gptResponse.match(/\{.*\}/s);
-                  if (jsonMatch) {
-                    try {
-                      parsedResponse = JSON.parse(jsonMatch[0]);
-                    } catch (e) {
-                      parsedResponse = null;
-                    }
-                  }
-                  
-                  // If extraction failed or no match, try parsing the whole string
-                  if (!parsedResponse) {
-                    try {
-                      parsedResponse = JSON.parse(gptResponse);
-                    } catch (e) {
-                      // Continue to fallback handling
-                    }
-                  }
-                } else if (typeof gptResponse === 'object') {
-                  // If it's already an object, use it directly
-                  parsedResponse = gptResponse;
-                }
-                
-                // If parsing was successful
-                if (parsedResponse) {
-                  // Calculate enhanced metrics
-                  calculateEnhancedMetrics(parsedResponse);
-                  
-                  // Store results for display
-                  setResults({
-                    specifications: parsedResponse,
-                    rawResponse: typeof gptResponse === 'string' ? gptResponse : JSON.stringify(gptResponse, null, 2)
-                  });
-                } else {
-                  throw new Error("Could not parse response as JSON");
-                }
-              } catch (e) {
-                // Extract useful info from text response - following your existing fallback pattern
-                let name = "Detected Shingle";
-                let manufacturer = "Unknown Manufacturer";
-                
-                if (typeof gptResponse === 'string') {
-                  // Try to extract basic info from the text
-                  if (gptResponse.includes("asphalt")) {
-                    name = "Asphalt Shingle";
-                  } else if (gptResponse.includes("wood") || gptResponse.includes("cedar")) {
-                    name = "Wood Shingle";
-                  } else if (gptResponse.includes("slate")) {
-                    name = "Slate Shingle";
-                  } else if (gptResponse.includes("metal")) {
-                    name = "Metal Roofing";
-                  }
-                  
-                  // Try to extract manufacturer if mentioned
-                  const commonManufacturers = ["GAF", "Owens Corning", "CertainTeed", "Malarkey", "IKO", "TAMKO", "Atlas"];
-                  for (const mfr of commonManufacturers) {
-                    if (gptResponse.includes(mfr)) {
-                      manufacturer = mfr;
-                      break;
-                    }
-                  }
-                }
-                
-                // Create a simplified response object following your pattern
-                const simplifiedResponse = {
-                  materialSpecification: {
-                    name: name,
-                    manufacturer: manufacturer,
-                    productLine: "Unknown",
-                    material: name.split(" ")[0],
-                    materialSubtype: "Unknown",
-                    weight: "Unknown",
-                    dimensions: "Unknown",
-                    thickness: "Unknown",
-                    estimatedAge: "Unknown",
-                    lifespan: "Unknown",
-                    pattern: "Unknown",
-                    warranty: "Unknown"
-                  },
-                  damageAssessment: {
-                    overallCondition: 'Unknown',
-                    damageTypes: [],
-                    damageSeverity: 0,
-                    description: 'Unable to assess damage from the provided image',
-                    recommendedAction: 'Consider a professional inspection'
-                  },
-                  repairAssessment: {
-                    repairRecommendation: "Unknown",
-                    urgency: "Unknown",
-                    repairDifficulty: "Unknown",
-                    diyFeasibility: false
-                  },
-                  metadata: {
-                    confidenceScore: 0,
-                    visibleSectionEstimate: 0,
-                    visibilityQuality: "Poor",
-                    limitationNotes: "Unable to process detailed analysis",
-                    additionalInspectionNeeded: true
-                  },
-                  rawText: typeof gptResponse === 'string' ? gptResponse : "No text response available"
-                };
-                
-                // Calculate basic metrics
-                calculateEnhancedMetrics(simplifiedResponse);
-                
-                // Set results with simplified response
-                setResults({
-                  specifications: simplifiedResponse,
-                  rawResponse: typeof gptResponse === 'string' ? gptResponse : JSON.stringify(gptResponse, null, 2)
-                });
-              }
+            // Store raw API response
+            setResults(data);
+            
+            // Extract structured data
+            const structuredData = extractStructuredData(data);
+            
+            if (structuredData) {
+              // Calculate enhanced metrics
+              calculateEnhancedMetrics(structuredData);
             } else {
-              throw new Error("Unexpected API response structure");
+              console.warn("Could not extract structured data from API response");
             }
           } else {
             throw new Error(`API error: ${data.error?.message || data.error || 'Unknown error'}`);
@@ -225,30 +146,208 @@ const EnhancedShingleAnalyzer = () => {
     try {
       if (!analysisData) return;
       
-      const materialSpecification = analysisData.materialSpecification || {};
-      const damageAssessment = analysisData.damageAssessment || {};
+      // Extract main sections with support for both naming conventions
+      const materialSpecification = analysisData['MATERIAL SPECIFICATION'] || analysisData.materialSpecification || {};
+      const damageAssessment = analysisData['DAMAGE ASSESSMENT'] || analysisData.damageAssessment || {};
       
-      // Calculate enhanced metrics
-      const totalDamagePercentage = responseUtils.calculateTotalDamagePercentage(damageAssessment);
-      const remainingLife = responseUtils.calculateRemainingLife(materialSpecification, damageAssessment);
-      const repairPriority = responseUtils.getRepairPriority(damageAssessment);
-      const costEstimates = responseUtils.estimateRepairCosts(damageAssessment, materialSpecification);
-      const repairOrReplace = responseUtils.getRepairOrReplaceRecommendation(
-        damageAssessment, 
-        materialSpecification
-      );
+      // Calculate total damage percentage
+      let totalDamagePercentage = 0;
+      const damageTypes = [
+        'granuleLoss',
+        'cracking',
+        'curling',
+        'blistering',
+        'missingShingles',
+        'hailDamage',
+        'waterDamage',
+        'algaeGrowth'
+      ];
+      
+      for (const type of damageTypes) {
+        if (damageAssessment[type] && damageAssessment[type].present) {
+          let coverage = damageAssessment[type].coverage;
+          
+          // Handle coverage as either number or string percentage
+          if (typeof coverage === 'string') {
+            const match = coverage.match(/(\d+)/);
+            if (match) {
+              coverage = parseInt(match[1], 10);
+            } else {
+              coverage = 0;
+            }
+          }
+          
+          totalDamagePercentage += coverage || 0;
+        }
+      }
+      
+      // Apply overlap adjustment (assuming 15% overlap between damage types)
+      if (totalDamagePercentage > 0) {
+        const damageTypesCount = damageTypes.filter(type => 
+          damageAssessment[type] && damageAssessment[type].present
+        ).length;
+        
+        if (damageTypesCount > 1) {
+          const overlapAdjustment = (damageTypesCount - 1) * 0.15;
+          totalDamagePercentage = Math.min(100, totalDamagePercentage * (1 - overlapAdjustment));
+        }
+      }
+      
+      // Calculate remaining roof life
+      let remainingLifeYears = "Unknown";
+      let remainingLifePercentage = 100;
+      
+      // Extract lifespan
+      let lifespan = 0;
+      if (materialSpecification.lifespan) {
+        const match = materialSpecification.lifespan.match(/(\d+)/);
+        if (match) {
+          lifespan = parseInt(match[1], 10);
+          if (materialSpecification.lifespan.includes('-')) {
+            // Handle range format (e.g., "20-25 years")
+            const range = materialSpecification.lifespan.match(/(\d+)-(\d+)/);
+            if (range && range.length >= 3) {
+              lifespan = (parseInt(range[1], 10) + parseInt(range[2], 10)) / 2;
+            }
+          }
+        }
+      }
+      
+      // Default lifespan based on material if not specified
+      if (!lifespan) {
+        const material = (materialSpecification.material || '').toLowerCase();
+        if (material.includes('asphalt')) {
+          lifespan = materialSpecification.materialSubtype?.toLowerCase().includes('architectural') ? 30 : 20;
+        } else if (material.includes('metal')) {
+          lifespan = 50;
+        } else if (material.includes('wood')) {
+          lifespan = 25;
+        } else if (material.includes('clay') || material.includes('slate')) {
+          lifespan = 75;
+        } else {
+          lifespan = 25; // Default
+        }
+      }
+      
+      // Extract age
+      let age = 0;
+      if (materialSpecification.estimatedAge) {
+        const match = materialSpecification.estimatedAge.match(/(\d+)/);
+        if (match) {
+          age = parseInt(match[1], 10);
+          if (materialSpecification.estimatedAge.includes('-')) {
+            // Handle range format (e.g., "5-7 years")
+            const range = materialSpecification.estimatedAge.match(/(\d+)-(\d+)/);
+            if (range && range.length >= 3) {
+              age = (parseInt(range[1], 10) + parseInt(range[2], 10)) / 2;
+            }
+          }
+        }
+      }
+      
+      // Calculate remaining life
+      if (lifespan > 0) {
+        // Base calculation
+        let remainingYears = Math.max(0, lifespan - age);
+        
+        // Adjust for damage severity
+        const severity = damageAssessment.damageSeverity || 0;
+        let damageMultiplier = 1;
+        
+        if (severity >= 8) {
+          damageMultiplier = 0.3; // 70% reduction
+        } else if (severity >= 6) {
+          damageMultiplier = 0.6; // 40% reduction
+        } else if (severity >= 4) {
+          damageMultiplier = 0.8; // 20% reduction
+        } else if (severity >= 2) {
+          damageMultiplier = 0.9; // 10% reduction
+        }
+        
+        remainingYears = Math.round(remainingYears * damageMultiplier);
+        remainingLifePercentage = Math.round((remainingYears / lifespan) * 100);
+        remainingLifeYears = remainingYears > 0 ? `${remainingYears} years` : 'Less than 1 year';
+      }
+      
+      // Determine repair priority
+      let repairPriority = "Unknown";
+      const severity = damageAssessment.damageSeverity || 0;
+      const structuralConcerns = damageAssessment.structuralConcerns || false;
+      const progressiveIssues = damageAssessment.progressiveIssues || false;
+      const waterDamage = damageAssessment.waterDamage?.present || false;
+      
+      if (structuralConcerns) {
+        repairPriority = "Immediate - Structural concerns present";
+      } else if (waterDamage && progressiveIssues) {
+        repairPriority = "High - Water damage with progressive deterioration";
+      } else if (severity >= 8) {
+        repairPriority = "Urgent - Severe damage requiring prompt attention";
+      } else if (severity >= 6) {
+        repairPriority = "High - Significant damage requiring timely repairs";
+      } else if (severity >= 4) {
+        repairPriority = "Moderate - Address within 3-6 months";
+      } else if (severity >= 2) {
+        repairPriority = "Low - Monitor and address during routine maintenance";
+      } else {
+        repairPriority = "None - No significant issues detected";
+      }
+      
+      // Extract or estimate costs
+      const repairAssessment = analysisData['REPAIR ASSESSMENT'] || analysisData.repairAssessment || {};
+      const repairCost = repairAssessment.anticipatedRepairCost || "$0 - $0";
+      const replacementCost = repairAssessment.anticipatedReplacementCost || "$0 - $0";
+      
+      // Get recommendation
+      let recommendation = repairAssessment.repairRecommendation || "Monitor";
+      let reasoning = "Based on the analysis of the roof condition.";
+      
+      if (severity <= 2 && totalDamagePercentage < 5) {
+        recommendation = "Monitor";
+        reasoning = "Minor damage detected. Monitor the condition and address any changes during routine maintenance.";
+      } else if (severity >= 7 || totalDamagePercentage > 35 || remainingLifePercentage < 25) {
+        recommendation = "Replace";
+        reasoning = "Significant damage detected or limited remaining lifespan. Replacement is recommended for long-term value.";
+      } else if (severity >= 4 || totalDamagePercentage > 15) {
+        recommendation = "Repair";
+        reasoning = "Moderate damage detected. Repairs are recommended to prevent further deterioration.";
+      }
       
       // Set enhanced metrics
       setEnhancedMetrics({
-        totalDamagePercentage,
-        remainingLife,
+        totalDamagePercentage: Math.round(totalDamagePercentage),
+        remainingLife: {
+          years: remainingLifeYears,
+          percentage: Math.min(100, Math.max(0, remainingLifePercentage))
+        },
         repairPriority,
-        costEstimates,
-        repairOrReplace
+        costEstimates: {
+          repair: repairCost,
+          replacement: replacementCost
+        },
+        repairOrReplace: {
+          recommendation,
+          reasoning
+        }
       });
     } catch (error) {
       console.error("Error calculating enhanced metrics:", error);
-      // Do not set state on error to avoid rendering issues
+      // Provide default metrics in case of error
+      setEnhancedMetrics({
+        totalDamagePercentage: 0,
+        remainingLife: {
+          years: "Unknown",
+          percentage: 100
+        },
+        repairPriority: "Unknown",
+        costEstimates: {
+          repair: "$0 - $0",
+          replacement: "$0 - $0"
+        },
+        repairOrReplace: {
+          recommendation: "Unknown",
+          reasoning: "Could not determine recommendation due to processing error."
+        }
+      });
     }
   };
 
@@ -372,7 +471,7 @@ const EnhancedShingleAnalyzer = () => {
         <div className="results-container">
           <div className="results-header">
             <div className="results-title">
-              <h2 className="shingle-name">{results.specifications.materialSpecification?.name || "Analyzed Shingle"}</h2>
+              <h2 className="shingle-name">Analyzed Shingle</h2>
               <p className="analysis-completed">
                 <span className="checkmark-icon check-icon"></span>
                 Analysis Complete
@@ -390,7 +489,6 @@ const EnhancedShingleAnalyzer = () => {
           {/* Enhanced Results Display */}
           <EnhancedResultsDisplay results={results} />
           
-          {/* Include footer info sections from original component */}
           <div className="info-section">
             <h3 className="section-subtitle">How This Works</h3>
             <p className="info-text">
