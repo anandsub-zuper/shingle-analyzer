@@ -2,18 +2,131 @@
 import React, { useState, useEffect } from 'react';
 import '../styles/EnhancedResultsDisplay.css';
 
+// Import both utility files
+import { 
+  extractJsonFromContent, 
+  normalizeApiResponse, 
+  safeGet,
+  attemptJsonRepair
+} from '../utils/jsonUtils';
+
+import {
+  calculateTotalDamagePercentage,
+  calculateRemainingLife,
+  getRepairPriority,
+  estimateRepairCosts,
+  getRepairOrReplaceRecommendation
+} from '../utils/responseUtils';
+
 const EnhancedResultsDisplay = ({ results }) => {
   const [activeTab, setActiveTab] = useState('specifications');
   const [parsedData, setParsedData] = useState(null);
+  // Additional state for calculated metrics
+  const [calculatedMetrics, setCalculatedMetrics] = useState({
+    damagePercentage: 0,
+    remainingLife: { years: 'Unknown', percentage: 0 },
+    repairPriority: 'Unknown',
+    costEstimates: { repair: 'Unknown', replacement: 'Unknown' },
+    repairRecommendation: { recommendation: 'Unknown', reasoning: 'Unknown' }
+  });
   
   // Parse data when results change
   useEffect(() => {
     if (results) {
-      const extractedData = extractStructuredData(results);
+      // First extract and normalize the JSON structure
+      let extractedData = null;
+      
+      // Check if we already have parsed results from backend
+      if (results.parsedResults) {
+        console.log("Using pre-parsed results from backend");
+        extractedData = normalizeApiResponse(results.parsedResults);
+      } else if (results.choices && results.choices[0] && results.choices[0].message) {
+        // Try to extract from message content
+        const content = results.choices[0].message.content;
+        
+        // Try to parse directly if it's already an object
+        if (typeof content === 'object' && content !== null) {
+          console.log("Content is already an object");
+          extractedData = normalizeApiResponse(content);
+        } else if (typeof content === 'string') {
+          // Try to extract JSON from the content string
+          const extractedJson = extractJsonFromContent(content);
+          if (extractedJson) {
+            extractedData = normalizeApiResponse(extractedJson);
+          } else {
+            // Try repair as a last resort
+            const repairedJson = attemptJsonRepair(content);
+            const extractedRepairedJson = extractJsonFromContent(repairedJson);
+            if (extractedRepairedJson) {
+              extractedData = normalizeApiResponse(extractedRepairedJson);
+            }
+          }
+        }
+      }
+      
+      if (!extractedData) {
+        // Last resort fallback
+        extractedData = {
+          materialSpecification: { name: "Unknown" },
+          damageAssessment: { overallCondition: "Unknown" },
+          repairAssessment: {},
+          metadata: {}
+        };
+      }
+      
       console.log("Extracted data:", extractedData);
       setParsedData(extractedData);
+      
+      // Calculate additional metrics using responseUtils once we have data
+      if (extractedData) {
+        calculateMetrics(extractedData);
+      }
     }
   }, [results]);
+  
+  // Calculate metrics using responseUtils
+  const calculateMetrics = (data) => {
+    const { materialSpecification, damageAssessment } = data;
+    
+    // Only proceed with calculations if we have meaningful data
+    if (!damageAssessment || !materialSpecification) return;
+    
+    try {
+      // Calculate total damage percentage
+      const damagePercentage = calculateTotalDamagePercentage(damageAssessment);
+      
+      // Calculate remaining life
+      const remainingLife = calculateRemainingLife(materialSpecification, damageAssessment);
+      
+      // Get repair priority
+      const repairPriority = getRepairPriority(damageAssessment);
+      
+      // Estimate repair costs
+      const costEstimates = estimateRepairCosts(damageAssessment, materialSpecification);
+      
+      // Get repair or replace recommendation
+      const repairRecommendation = getRepairOrReplaceRecommendation(damageAssessment, materialSpecification);
+      
+      // Update state with calculated metrics
+      setCalculatedMetrics({
+        damagePercentage,
+        remainingLife,
+        repairPriority,
+        costEstimates,
+        repairRecommendation
+      });
+      
+      console.log("Calculated metrics:", {
+        damagePercentage,
+        remainingLife,
+        repairPriority,
+        costEstimates,
+        repairRecommendation
+      });
+    } catch (error) {
+      console.error("Error calculating metrics:", error);
+    }
+  };
   
   // Early return if no results
   if (!results) {
@@ -41,182 +154,6 @@ const EnhancedResultsDisplay = ({ results }) => {
       </div>
     );
   }
-  
-  // Enhanced function to extract structured data from API response
-  function extractStructuredData(apiResponse) {
-    try {
-      console.log("Extracting from API response");
-      
-      // First check if we already have parsed results from backend
-      if (apiResponse.parsedResults) {
-        console.log("Using pre-parsed results from backend");
-        return apiResponse.parsedResults;
-      }
-      
-      // Extract from raw API response
-      if (apiResponse.choices && apiResponse.choices[0] && apiResponse.choices[0].message) {
-        const content = apiResponse.choices[0].message.content;
-        
-        // Try to parse directly if it's already an object
-        if (typeof content === 'object' && content !== null) {
-          console.log("Content is already an object");
-          return normalizeDataStructure(content);
-        }
-        
-        // If content is not a string, can't process further
-        if (typeof content !== 'string') {
-          console.error("Content is not a string:", content);
-          return null;
-        }
-        
-        // Try multiple extraction methods
-        
-        // Method 1: Look for JSON code block
-        if (content.includes('```json')) {
-          console.log("Found JSON code block, attempting to extract");
-          const jsonMatch = content.match(/```json\s*([\s\S]*?)(\s*```|$)/);
-          
-          if (jsonMatch && jsonMatch[1]) {
-            try {
-              const parsed = JSON.parse(jsonMatch[1]);
-              console.log("Successfully parsed JSON from code block");
-              return normalizeDataStructure(parsed);
-            } catch (e) {
-              console.error("Failed to parse JSON from code block:", e);
-              // Continue to other methods
-            }
-          }
-        }
-        
-        // Method 2: Look for direct JSON object in content
-        try {
-          const jsonMatch = content.match(/\{[\s\S]*\}/);
-          if (jsonMatch) {
-            const parsed = JSON.parse(jsonMatch[0]);
-            console.log("Successfully parsed direct JSON in content");
-            return normalizeDataStructure(parsed);
-          }
-        } catch (e) {
-          console.error("Failed to parse direct JSON:", e);
-          // Continue to other methods
-        }
-        
-        // Method 3: Use a more flexible extraction approach
-        // Find the largest JSON-like structure in the content
-        let maxOpenBraces = 0;
-        let currentOpenBraces = 0;
-        let potentialStart = -1;
-        let potentialEnd = -1;
-        
-        for (let i = 0; i < content.length; i++) {
-          if (content[i] === '{') {
-            if (currentOpenBraces === 0) {
-              potentialStart = i;
-            }
-            currentOpenBraces++;
-            maxOpenBraces = Math.max(maxOpenBraces, currentOpenBraces);
-          } else if (content[i] === '}') {
-            currentOpenBraces--;
-            if (currentOpenBraces === 0 && potentialStart !== -1) {
-              potentialEnd = i;
-              // Try to parse this potential JSON object
-              try {
-                const jsonSubstring = content.substring(potentialStart, potentialEnd + 1);
-                const parsed = JSON.parse(jsonSubstring);
-                console.log("Successfully parsed JSON using flexible extraction");
-                return normalizeDataStructure(parsed);
-              } catch (e) {
-                // Continue looking
-                console.log("Failed to parse potential JSON section, continuing search");
-              }
-            }
-          }
-        }
-        
-        // Method 4: Attempt to extract structured data even from non-JSON format
-        // Look for key sections that might be in the content
-        console.log("Attempting to extract structured data from text content");
-        const extractedData = {
-          materialSpecification: {},
-          damageAssessment: {},
-          repairAssessment: {},
-          metadata: {}
-        };
-        
-        // Try to extract basic material info
-        const materialNameMatch = content.match(/Material:[\s\n]*(.*?)[\s\n]*(\.|$)/i);
-        if (materialNameMatch) {
-          extractedData.materialSpecification.name = materialNameMatch[1].trim();
-        }
-        
-        const manufacturerMatch = content.match(/Manufacturer:[\s\n]*(.*?)[\s\n]*(\.|$)/i);
-        if (manufacturerMatch) {
-          extractedData.materialSpecification.manufacturer = manufacturerMatch[1].trim();
-        }
-        
-        // Try to extract condition
-        const conditionMatch = content.match(/Condition:[\s\n]*(Excellent|Good|Fair|Poor|Critical)[\s\n]*(\.|$)/i);
-        if (conditionMatch) {
-          extractedData.damageAssessment.overallCondition = conditionMatch[1].trim();
-        }
-        
-        // If we have at least some structured data, return it
-        if (extractedData.materialSpecification.name || extractedData.damageAssessment.overallCondition) {
-          console.log("Created structured data from text content");
-          return extractedData;
-        }
-      }
-      
-      // If we reach here, we couldn't extract structured data
-      console.error("Could not extract structured data from API response");
-      return {
-        materialSpecification: { name: "Unknown" },
-        damageAssessment: { overallCondition: "Unknown" },
-        repairAssessment: {},
-        metadata: {}
-      };
-    } catch (error) {
-      console.error("Error in extractStructuredData:", error);
-      return {
-        materialSpecification: { name: "Unknown" },
-        damageAssessment: { overallCondition: "Unknown" },
-        repairAssessment: {},
-        metadata: {}
-      };
-    }
-  }
-  
-  // Helper function to normalize the data structure
-  function normalizeDataStructure(data) {
-    // Create a standardized structure regardless of case/format
-    return {
-      materialSpecification: data["MATERIAL SPECIFICATION"] || 
-                             data["materialSpecification"] || 
-                             data["material_specification"] || 
-                             {},
-      damageAssessment: data["DAMAGE ASSESSMENT"] || 
-                        data["damageAssessment"] || 
-                        data["damage_assessment"] || 
-                        {},
-      repairAssessment: data["REPAIR ASSESSMENT"] || 
-                        data["repairAssessment"] || 
-                        data["repair_assessment"] || 
-                        {},
-      metadata: data["METADATA"] || 
-                data["metadata"] || 
-                {}
-    };
-  }
-  
-  // Helper function to safely access nested properties
-  const safeGet = (obj, path, defaultValue = "Unknown") => {
-    try {
-      const result = path.split('.').reduce((o, p) => o?.[p], obj);
-      return result !== undefined && result !== null ? result : defaultValue;
-    } catch (e) {
-      return defaultValue;
-    }
-  };
   
   // Helper function to get severity color
   const getSeverityColor = (severity) => {
@@ -297,6 +234,18 @@ const EnhancedResultsDisplay = ({ results }) => {
             <span className="spec-label">Expected Lifespan</span>
             <span className="spec-value">{safeGet(materialSpec, 'lifespan')}</span>
           </div>
+          
+          {/* Display calculated remaining life */}
+          <div className="spec-item">
+            <span className="spec-label">Remaining Life</span>
+            <span className="spec-value">
+              {calculatedMetrics.remainingLife.years}
+              {calculatedMetrics.remainingLife.percentage > 0 && (
+                <span className="percentage-indicator"> ({calculatedMetrics.remainingLife.percentage}%)</span>
+              )}
+            </span>
+          </div>
+          
           <div className="spec-item">
             <span className="spec-label">Warranty</span>
             <span className="spec-value">{safeGet(materialSpec, 'warranty')}</span>
@@ -405,6 +354,27 @@ const EnhancedResultsDisplay = ({ results }) => {
               />
               <span className="severity-value">{safeGet(damageAssessment, 'damageSeverity', 0)}/10</span>
             </div>
+          </div>
+          
+          {/* Display calculated total damage percentage */}
+          <div className="total-damage-percentage">
+            <span className="percentage-label">Total Affected Area:</span>
+            <div className="percentage-meter">
+              <div 
+                className="percentage-fill" 
+                style={{ 
+                  width: `${calculatedMetrics.damagePercentage}%`,
+                  backgroundColor: getSeverityColor(Math.min(10, calculatedMetrics.damagePercentage / 10))
+                }}
+              />
+              <span className="percentage-value">{calculatedMetrics.damagePercentage}%</span>
+            </div>
+          </div>
+          
+          {/* Display calculated repair priority */}
+          <div className="repair-priority">
+            <span className="priority-label">Priority:</span>
+            <span className="priority-value">{calculatedMetrics.repairPriority}</span>
           </div>
           
           {damageTypes.length > 0 && (
@@ -519,6 +489,24 @@ const EnhancedResultsDisplay = ({ results }) => {
           </div>
         </div>
         
+        {/* Display calculated repair vs replace recommendation */}
+        {calculatedMetrics.repairRecommendation.recommendation !== 'Unknown' && (
+          <div className="calculated-recommendation">
+            <h3 className="section-subtitle">Repair vs. Replace Analysis</h3>
+            <div className={`recommendation-box recommendation-${calculatedMetrics.repairRecommendation.recommendation.toLowerCase()}`}>
+              <div className="recommendation-header">
+                <span className="recommendation-icon">
+                  {calculatedMetrics.repairRecommendation.recommendation === 'Replace' ? '🔄' : '🔧'}
+                </span>
+                <h4>{calculatedMetrics.repairRecommendation.recommendation}</h4>
+              </div>
+              <p className="recommendation-reasoning">
+                {calculatedMetrics.repairRecommendation.reasoning}
+              </p>
+            </div>
+          </div>
+        )}
+        
         <div className="repair-details">
           <div className="repair-difficulty">
             <span className="difficulty-label">Repair Difficulty:</span>
@@ -532,14 +520,29 @@ const EnhancedResultsDisplay = ({ results }) => {
           
           <div className="cost-estimates">
             <div className="cost-item repair-cost">
-              <span className="cost-label">Estimated Repair Cost:</span>
+              <span className="cost-label">API Estimated Repair Cost:</span>
               <span className="cost-value">{safeGet(repairAssessment, 'anticipatedRepairCost')}</span>
             </div>
             
             <div className="cost-item replacement-cost">
-              <span className="cost-label">Estimated Replacement Cost:</span>
+              <span className="cost-label">API Estimated Replacement Cost:</span>
               <span className="cost-value">{safeGet(repairAssessment, 'anticipatedReplacementCost')}</span>
             </div>
+            
+            {/* Display calculated cost estimates */}
+            {calculatedMetrics.costEstimates.repair !== 'Unknown' && (
+              <>
+                <div className="cost-item calculated-repair-cost">
+                  <span className="cost-label">Calculated Repair Cost:</span>
+                  <span className="cost-value">{calculatedMetrics.costEstimates.repair}</span>
+                </div>
+                
+                <div className="cost-item calculated-replacement-cost">
+                  <span className="cost-label">Calculated Replacement Cost:</span>
+                  <span className="cost-value">{calculatedMetrics.costEstimates.replacement}</span>
+                </div>
+              </>
+            )}
           </div>
           
           {specialConsiderations.length > 0 && (
@@ -609,6 +612,29 @@ const EnhancedResultsDisplay = ({ results }) => {
             </div>
           )}
         </div>
+        
+        {/* Display all calculated metrics in a summarized view */}
+        <div className="calculated-metrics-section">
+          <h4>Calculated Metrics Summary</h4>
+          <div className="metrics-grid">
+            <div className="metric-item">
+              <span className="metric-label">Total Damage %:</span>
+              <span className="metric-value">{calculatedMetrics.damagePercentage}%</span>
+            </div>
+            <div className="metric-item">
+              <span className="metric-label">Remaining Life:</span>
+              <span className="metric-value">{calculatedMetrics.remainingLife.years} ({calculatedMetrics.remainingLife.percentage}%)</span>
+            </div>
+            <div className="metric-item">
+              <span className="metric-label">Repair Priority:</span>
+              <span className="metric-value">{calculatedMetrics.repairPriority}</span>
+            </div>
+            <div className="metric-item">
+              <span className="metric-label">Recommendation:</span>
+              <span className="metric-value">{calculatedMetrics.repairRecommendation.recommendation}</span>
+            </div>
+          </div>
+        </div>
       </div>
     );
   };
@@ -621,6 +647,12 @@ const EnhancedResultsDisplay = ({ results }) => {
         <div className="raw-data-code">
           <pre>{JSON.stringify(parsedData, null, 2)}</pre>
         </div>
+        
+        <h3>Calculated Metrics</h3>
+        <div className="raw-data-code">
+          <pre>{JSON.stringify(calculatedMetrics, null, 2)}</pre>
+        </div>
+        
         <div className="raw-data-code">
           <h4>Original API Response:</h4>
           <pre>{JSON.stringify(results, null, 2).substring(0, 2000)}...</pre>
@@ -634,6 +666,7 @@ const EnhancedResultsDisplay = ({ results }) => {
     console.log("======== DEBUG DATA ========");
     console.log("Raw results:", results);
     console.log("Parsed data:", parsedData);
+    console.log("Calculated metrics:", calculatedMetrics);
     console.log("Material spec:", parsedData?.materialSpecification);
     console.log("Damage assessment:", parsedData?.damageAssessment);
     console.log("===========================");
