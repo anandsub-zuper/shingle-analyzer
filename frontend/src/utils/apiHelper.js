@@ -1,7 +1,7 @@
 // src/utils/apiHelper.js
 
 /**
- * Utility functions for API communication with robust error handling
+ * Utility functions for API communication with robust error handling and performance monitoring
  */
 
 /**
@@ -18,6 +18,16 @@ const API_BASE_URL = 'https://shingle-analyzer-cf8f8df19174.herokuapp.com';
  * Default timeout in milliseconds
  */
 const DEFAULT_TIMEOUT = 60000; // 60 seconds
+
+/**
+ * Timeout for the first request attempt (shorter to fail fast)
+ */
+const FIRST_ATTEMPT_TIMEOUT = 25000; // 25 seconds (shorter than Heroku's 30s limit)
+
+/**
+ * Keep-alive ping interval in milliseconds
+ */
+const KEEP_ALIVE_INTERVAL = 15000; // 15 seconds
 
 /**
  * Calculate exponential backoff delay for retries
@@ -112,7 +122,61 @@ export const fetchWithTimeout = async (url, options = {}, timeout = DEFAULT_TIME
 };
 
 /**
- * Call API with retry logic
+ * Helper function to handle API responses
+ * @param {Response} response - Fetch response object
+ * @returns {Promise<Object>} Parsed response data
+ */
+const handleResponse = async (response) => {
+  // Handle different content types
+  const contentType = response.headers.get('content-type');
+  
+  if (contentType && contentType.includes('application/json')) {
+    const data = await response.json();
+    
+    // Check if response is OK (status in 200-299 range)
+    if (!response.ok) {
+      throw new Error(`API error: ${data.error?.message || data.error || response.statusText}`);
+    }
+    
+    return data;
+  } else {
+    // For non-JSON responses
+    const text = await response.text();
+    
+    if (!response.ok) {
+      throw new Error(`API error: ${response.statusText} - ${text.substring(0, 100)}`);
+    }
+    
+    // Try to extract JSON from text response
+    try {
+      return JSON.parse(text);
+    } catch (e) {
+      // Return text response if it's not JSON
+      return { text, contentType };
+    }
+  }
+};
+
+/**
+ * Send a ping request to keep the connection alive
+ * @param {string} url - URL to ping
+ */
+const sendKeepAlivePing = async (url) => {
+  try {
+    await fetch(url, { 
+      method: 'OPTIONS',
+      headers: {
+        'Content-Type': 'application/json'
+      }
+    });
+  } catch (e) {
+    // Ignore errors, this is just a keep-alive ping
+    console.log('Keep-alive ping error (safe to ignore):', e.message);
+  }
+};
+
+/**
+ * Call API with improved timeout handling and retry logic
  * @param {string} endpoint - API endpoint
  * @param {Object} options - Fetch options
  * @param {number} maxRetries - Maximum number of retries
@@ -128,6 +192,7 @@ export const callApiWithRetry = async (
   onRetry = null
 ) => {
   let lastError;
+  const monitor = monitorApiCall(endpoint);
   
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     try {
@@ -144,35 +209,42 @@ export const callApiWithRetry = async (
         await new Promise(resolve => setTimeout(resolve, delay));
       }
       
-      // Make the API call with timeout
+      // Build the URL
       const url = endpoint.startsWith('http') ? endpoint : `${API_BASE_URL}${endpoint}`;
-      const response = await fetchWithTimeout(url, options, timeout);
       
-      // Handle non-JSON responses
-      const contentType = response.headers.get('content-type');
-      if (contentType && contentType.includes('application/json')) {
-        const data = await response.json();
-        
-        // Check if response is OK (status in 200-299 range)
-        if (!response.ok) {
-          throw new Error(`API error: ${data.error?.message || data.error || response.statusText}`);
-        }
-        
+      // Use a different strategy for the first attempt vs. retries
+      if (attempt === 0) {
+        // For first attempt, set a shorter timeout to avoid Heroku's 30s limit
+        // This lets us fail fast and retry
+        const response = await fetchWithTimeout(url, options, FIRST_ATTEMPT_TIMEOUT);
+        const data = await handleResponse(response);
+        monitor.success(data);
         return data;
       } else {
-        // For non-JSON responses
-        const text = await response.text();
+        // For retry attempts, use normal timeout but add connection monitoring
+        const controller = new AbortController();
+        const { signal } = controller;
         
-        if (!response.ok) {
-          throw new Error(`API error: ${response.statusText} - ${text.substring(0, 100)}`);
-        }
+        // Add signal to options
+        const newOptions = {
+          ...options,
+          signal
+        };
         
-        // Try to extract JSON from text response (sometimes APIs return JSON with wrong content-type)
+        // Set up a ping interval to keep the connection alive
+        const pingInterval = setInterval(() => {
+          sendKeepAlivePing(url);
+        }, KEEP_ALIVE_INTERVAL);
+        
         try {
-          return JSON.parse(text);
-        } catch (e) {
-          // Return text response if it's not JSON
-          return { text, contentType };
+          const response = await fetch(url, newOptions);
+          clearInterval(pingInterval);
+          const data = await handleResponse(response);
+          monitor.success(data);
+          return data;
+        } catch (error) {
+          clearInterval(pingInterval);
+          throw error;
         }
       }
     } catch (error) {
@@ -200,8 +272,47 @@ export const callApiWithRetry = async (
     }
   }
   
-  // If we've exhausted all retries, throw the last error
+  // If we've exhausted all retries, log and throw the last error
+  monitor.error(lastError);
   throw lastError;
+};
+
+/**
+ * Performance monitoring for API calls
+ * @param {string} endpoint - API endpoint being called
+ * @param {function} callback - Optional callback for monitoring events
+ * @returns {Object} Monitoring functions
+ */
+export const monitorApiCall = (endpoint, callback) => {
+  const start = Date.now();
+  let requestStatus = 'pending';
+  
+  // Return the monitoring result
+  return {
+    // Function to call when request completes successfully
+    success: (data) => {
+      const duration = Date.now() - start;
+      requestStatus = 'success';
+      console.log(`[Performance] Request to ${endpoint} completed successfully in ${duration}ms`);
+      
+      // Call user callback if provided
+      if (callback) callback({ duration, status: requestStatus, data });
+      
+      return { duration, status: requestStatus };
+    },
+    
+    // Function to call when request fails
+    error: (error) => {
+      const duration = Date.now() - start;
+      requestStatus = 'error';
+      console.log(`[Performance] Request to ${endpoint} failed after ${duration}ms: ${error.message}`);
+      
+      // Call user callback if provided
+      if (callback) callback({ duration, status: requestStatus, error });
+      
+      return { duration, status: requestStatus };
+    }
+  };
 };
 
 /**
@@ -213,11 +324,7 @@ export const callApiWithRetry = async (
  */
 export const analyzeImage = async (base64Image, signal, onRetry = null) => {
   // First ping the server to wake it up
-  const isAwake = await pingServer();
-  
-  if (!isAwake) {
-    console.log('Server appears to be asleep, expect longer response time');
-  }
+  await pingServer();
   
   // Call the API with retries
   return callApiWithRetry(
@@ -254,5 +361,6 @@ export default {
   fetchWithTimeout,
   callApiWithRetry,
   analyzeImage,
-  checkApiStatus
+  checkApiStatus,
+  monitorApiCall
 };
