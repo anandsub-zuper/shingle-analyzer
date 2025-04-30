@@ -1,4 +1,4 @@
-/* src/App.css */
+/* src/App.css - Updated */
 .App {
   text-align: center;
   background-color: #f0f4f8;
@@ -84,6 +84,7 @@ main {
   border-radius: 8px;
   transition: all 0.3s ease;
   background-color: #e2e8f0;
+  position: relative;
 }
 
 .nav-link:hover {
@@ -94,6 +95,92 @@ main {
 .nav-link.active {
   background-color: #4361ee;
   color: white;
+}
+
+.nav-link.coming-soon::after {
+  content: '';
+  position: absolute;
+  top: -8px;
+  right: -8px;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background-color: #f56565;
+  border: 2px solid #fff;
+}
+
+/* Coming Soon Page */
+.coming-soon-container {
+  width: 100%;
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 40px 20px;
+  text-align: center;
+}
+
+.coming-soon-content {
+  background-color: #fff;
+  border-radius: 12px;
+  padding: 40px;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+}
+
+.coming-soon-content h2 {
+  font-size: 2.5rem;
+  color: #2d3748;
+  margin-bottom: 20px;
+}
+
+.coming-soon-badge {
+  display: inline-block;
+  padding: 8px 16px;
+  background-color: #4361ee;
+  color: white;
+  font-weight: 600;
+  border-radius: 50px;
+  margin-bottom: 30px;
+  font-size: 1rem;
+  letter-spacing: 0.5px;
+  box-shadow: 0 4px 6px rgba(67, 97, 238, 0.2);
+}
+
+.coming-soon-description {
+  font-size: 1.1rem;
+  color: #4a5568;
+  margin-bottom: 25px;
+  line-height: 1.6;
+}
+
+.coming-soon-features {
+  text-align: left;
+  list-style-position: inside;
+  margin: 0 auto 30px;
+  width: fit-content;
+  padding: 20px 30px;
+  background-color: #f7fafc;
+  border-radius: 10px;
+  border-left: 4px solid #4361ee;
+}
+
+.coming-soon-features li {
+  padding: 10px 0;
+  color: #4a5568;
+  position: relative;
+  padding-left: 10px;
+}
+
+.coming-soon-features li::before {
+  content: "•";
+  color: #4361ee;
+  font-weight: bold;
+  margin-right: 10px;
+}
+
+.coming-soon-subscribe {
+  font-size: 1.2rem;
+  font-weight: 600;
+  color: #2d3748;
+  margin-top: 20px;
 }
 
 /* Responsive adjustments */
@@ -115,5 +202,17 @@ main {
     flex-direction: column;
     gap: 10px;
     align-items: center;
+  }
+
+  .coming-soon-content {
+    padding: 25px 15px;
+  }
+
+  .coming-soon-content h2 {
+    font-size: 1.8rem;
+  }
+
+  .coming-soon-features {
+    padding: 15px;
   }
 }
