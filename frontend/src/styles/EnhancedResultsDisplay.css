@@ -816,3 +816,110 @@
     max-height: 300px;
   }
 }
+/* Add this to your src/styles/EnhancedResultsDisplay.css file */
+
+.enhanced-metrics-container {
+  background-color: var(--white);
+  border-radius: var(--border-radius);
+  padding: 1.5rem;
+  margin-bottom: 1.5rem;
+  box-shadow: var(--card-shadow);
+}
+
+.metrics-title {
+  font-size: 1.25rem;
+  font-weight: 600;
+  margin-bottom: 1.5rem;
+  position: relative;
+  padding-left: 1rem;
+  color: var(--gray-800);
+}
+
+.metrics-title::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0.25rem;
+  width: 4px;
+  height: 1rem;
+  background-color: var(--primary);
+  border-radius: 2px;
+}
+
+.metrics-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 1.25rem;
+}
+
+.metric-item {
+  background-color: var(--gray-100);
+  padding: 1.25rem;
+  border-radius: var(--border-radius);
+  display: flex;
+  flex-direction: column;
+  transition: transform 0.2s ease;
+}
+
+.metric-item:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.metric-label {
+  font-size: 0.875rem;
+  color: var(--gray-600);
+  margin-bottom: 0.5rem;
+}
+
+.metric-value {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: var(--gray-800);
+}
+
+.progress-bar-container {
+  height: 0.5rem;
+  background-color: var(--gray-200);
+  border-radius: 0.25rem;
+  margin-top: 0.75rem;
+  overflow: hidden;
+}
+
+.progress-bar {
+  height: 100%;
+  background: linear-gradient(90deg, #ef476f 0%, #ffd166 50%, #06d6a0 100%);
+  transition: width 0.5s ease;
+}
+
+.recommendation-item {
+  grid-column: 1 / -1;
+  background-color: rgba(67, 97, 238, 0.05);
+  border-left: 4px solid var(--primary);
+}
+
+.recommendation-value {
+  margin-bottom: 0.75rem;
+}
+
+.recommendation-reasoning {
+  margin: 0.5rem 0 0;
+  font-size: 0.95rem;
+  color: var(--gray-700);
+  line-height: 1.5;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .metrics-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .metric-item:hover {
+    transform: none;
+  }
+  
+  .metric-value {
+    font-size: 1.125rem;
+  }
+}
