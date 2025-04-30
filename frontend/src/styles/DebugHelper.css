@@ -2,4 +2,179 @@
 
 .debug-helper {
   margin: 20px 0;
-  padding
+  padding: 15px;
+  background-color: #f8f9fc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+}
+
+.debug-helper h3 {
+  margin-top: 0;
+  color: #2d3748;
+  border-bottom: 2px solid #e2e8f0;
+  padding-bottom: 8px;
+  font-size: 1.2rem;
+}
+
+.debug-helper h4 {
+  color: #4a5568;
+  margin-bottom: 8px;
+  margin-top: 15px;
+  font-size: 1rem;
+}
+
+.debug-helper ul {
+  background-color: white;
+  padding: 12px;
+  border-radius: 6px;
+  box-shadow: inset 0 2px 4px rgba(0,0,0,0.05);
+  margin: 0;
+  list-style-position: inside;
+}
+
+.debug-helper pre, 
+.debug-helper .code-block {
+  max-height: 200px;
+  overflow: auto;
+  padding: 12px;
+  background-color: #1a202c;
+  color: #e2e8f0;
+  border-radius: 6px;
+  font-size: 0.9rem;
+  font-family: 'Courier New', monospace;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.debug-helper .code-block.tall {
+  max-height: 500px;
+}
+
+.debug-helper button {
+  padding: 8px 12px;
+  background-color: #4361ee;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: 600;
+  transition: all 0.2s ease;
+  font-size: 0.9rem;
+}
+
+.debug-helper button:hover {
+  background-color: #3a56d4;
+  transform: translateY(-2px);
+}
+
+.debug-helper .tips {
+  margin-top: 15px;
+  padding-top: 15px;
+  border-top: 1px solid #e2e8f0;
+  font-size: 0.9rem;
+  color: #718096;
+}
+
+.debug-helper .tips p {
+  margin: 0;
+}
+
+.debug-helper .tips ul {
+  margin: 8px 0 0 0;
+  padding-left: 20px;
+  background-color: transparent;
+  box-shadow: none;
+}
+
+.debug-helper .tip-item {
+  margin-bottom: 5px;
+}
+
+.debug-empty {
+  padding: 15px;
+  background-color: #f8f9fc;
+  border: 1px dashed #e2e8f0;
+  border-radius: 8px;
+  color: #a0aec0;
+  text-align: center;
+  font-style: italic;
+}
+
+.debug-section {
+  margin-bottom: 15px;
+}
+
+.success-message {
+  padding: 10px;
+  background-color: #d1fae5;
+  color: #065f46;
+  border-radius: 6px;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+}
+
+.success-message:before {
+  content: "✅";
+  margin-right: 8px;
+}
+
+.error-message {
+  padding: 10px;
+  background-color: #fed7d7;
+  color: #822727;
+  border-radius: 6px;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+}
+
+.error-message:before {
+  content: "❌";
+  margin-right: 8px;
+}
+
+.debug-toggle {
+  padding: 0.75rem;
+  background-color: #E2E8F0;
+  color: #4A5568;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 600;
+  transition: all 0.3s ease;
+}
+
+.debug-toggle.active {
+  background-color: #4A5568;
+  color: white;
+}
+
+.button-group {
+  display: flex;
+  gap: 12px;
+  margin-top: 1.5rem;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .debug-helper h3 {
+    font-size: 1.1rem;
+  }
+  
+  .debug-helper h4 {
+    font-size: 0.95rem;
+  }
+  
+  .debug-helper pre, 
+  .debug-helper .code-block {
+    font-size: 0.8rem;
+    max-height: 150px;
+  }
+  
+  .button-group {
+    flex-direction: column;
+  }
+}
