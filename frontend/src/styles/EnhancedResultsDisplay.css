@@ -972,3 +972,244 @@
     max-height: 300px;
   }
 }
+/* Add these additional styles to your existing EnhancedResultsDisplay.css file */
+
+/* Calculated Metrics Styles */
+.percentage-indicator {
+  font-size: 0.85rem;
+  color: var(--gray-600);
+  margin-left: 0.25rem;
+}
+
+.total-damage-percentage {
+  margin: 1rem 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  background-color: white;
+  padding: 1rem;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+.percentage-label {
+  font-weight: 600;
+  color: #1f2937;
+  display: flex;
+  align-items: center;
+}
+
+.percentage-meter {
+  height: 0.9rem;
+  background-color: #e5e7eb;
+  border-radius: 0.5rem;
+  overflow: hidden;
+  position: relative;
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.percentage-fill {
+  height: 100%;
+  transition: width 0.5s ease;
+}
+
+.percentage-value {
+  position: absolute;
+  right: 0.7rem;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: white;
+  text-shadow: 0 0 3px rgba(0, 0, 0, 0.7);
+  background-color: rgba(0, 0, 0, 0.2);
+  padding: 0.15rem 0.4rem;
+  border-radius: 4px;
+}
+
+.repair-priority {
+  margin: 0.5rem 0;
+  background-color: white;
+  padding: 1rem;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.priority-label {
+  font-weight: 600;
+  color: #1f2937;
+}
+
+.priority-value {
+  background-color: #4361ee;
+  color: white;
+  padding: 0.35rem 0.75rem;
+  border-radius: 50px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  box-shadow: 0 2px 5px rgba(67, 97, 238, 0.25);
+}
+
+/* Calculated Recommendation Box */
+.calculated-recommendation {
+  margin: 1.5rem 0;
+}
+
+.recommendation-box {
+  background-color: #f3f4f6;
+  border-radius: 12px;
+  padding: 1.25rem;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  border-left: 4px solid #4361ee;
+}
+
+.recommendation-header {
+  display: flex;
+  align-items: center;
+  margin-bottom: 0.75rem;
+}
+
+.recommendation-icon {
+  font-size: 1.5rem;
+  margin-right: 0.75rem;
+}
+
+.recommendation-header h4 {
+  margin: 0;
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: #1f2937;
+}
+
+.recommendation-reasoning {
+  color: #4b5563;
+  margin: 0;
+  line-height: 1.6;
+}
+
+.recommendation-box.recommendation-repair {
+  background-color: #e0efff;
+  border-left-color: #0ea5e9;
+}
+
+.recommendation-box.recommendation-replace {
+  background-color: #ffedd5;
+  border-left-color: #f97316;
+}
+
+.recommendation-box.recommendation-monitor {
+  background-color: #d1fae5;
+  border-left-color: #10b981;
+}
+
+.recommendation-box.recommendation-consider-replacement {
+  background-color: #fef3c7;
+  border-left-color: #f59e0b;
+}
+
+/* Cost Estimates Extended Styles */
+.calculated-repair-cost,
+.calculated-replacement-cost {
+  background-color: rgba(67, 97, 238, 0.05);
+  border: 1px solid rgba(67, 97, 238, 0.1);
+}
+
+.calculated-repair-cost .cost-value,
+.calculated-replacement-cost .cost-value {
+  color: #4f46e5;
+}
+
+/* Calculated Metrics in Metadata Tab */
+.calculated-metrics-section {
+  margin-top: 2rem;
+  background-color: white;
+  padding: 1.5rem;
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+
+.calculated-metrics-section h4 {
+  font-size: 1.1rem;
+  font-weight: 700;
+  margin-top: 0;
+  margin-bottom: 1rem;
+  color: #1f2937;
+  position: relative;
+  padding-left: 1rem;
+}
+
+.calculated-metrics-section h4::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0.25rem;
+  width: 4px;
+  height: 1rem;
+  background-color: #4361ee;
+  border-radius: 2px;
+}
+
+.metrics-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 1rem;
+}
+
+.metric-item {
+  background-color: #f8faff;
+  padding: 1rem;
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  transition: transform 0.2s ease;
+  border: 1px solid rgba(67, 97, 238, 0.1);
+}
+
+.metric-item:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+}
+
+.metric-label {
+  font-size: 0.8rem;
+  color: #6b7280;
+  margin-bottom: 0.5rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  font-weight: 600;
+}
+
+.metric-value {
+  font-weight: 600;
+  color: #1f2937;
+  font-size: 1.05rem;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .metrics-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .recommendation-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  
+  .recommendation-icon {
+    margin-bottom: 0.5rem;
+    margin-right: 0;
+  }
+  
+  .repair-priority {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  
+  .priority-value {
+    margin-top: 0.5rem;
+  }
+}
