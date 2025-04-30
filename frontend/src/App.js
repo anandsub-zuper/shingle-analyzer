@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Link, useLocation } from 'react-router-dom';
 import ShingleAnalyzer from './components/ShingleAnalyzer';
 import ThreeDRoofAnalyzer from './components/ThreeDRoofAnalyzer';
+import EnhancedShingleAnalyzer from './components/EnhancedShingleAnalyzer';
 import './App.css';
 
 // Create a wrapper component to handle location changes
@@ -42,6 +43,22 @@ function AppContent() {
           >
             3D Roof Analysis
           </Link>
+              <Link 
+  to="/enhanced-analyzer" 
+  className={`nav-link ${activeTab === 'enhanced' ? 'active' : ''}`}
+  onClick={() => setActiveTab('enhanced')}
+>
+  Enhanced Roof Analysis
+</Link>
+    useEffect(() => {
+  if (location.pathname === '/3d-analyzer') {
+    setActiveTab('3d');
+  } else if (location.pathname === '/enhanced-analyzer') {
+    setActiveTab('enhanced');
+  } else {
+    setActiveTab('shingle');
+  }
+}, [location]);
         </nav>
       </header>
       
@@ -49,6 +66,7 @@ function AppContent() {
         <Routes>
           <Route path="/" element={<ShingleAnalyzer />} />
           <Route path="/3d-analyzer" element={<ThreeDRoofAnalyzer />} />
+          <Route path="/enhanced-analyzer" element={<EnhancedShingleAnalyzer />} />
         </Routes>
       </main>
       
