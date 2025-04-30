@@ -9,14 +9,22 @@ import './App.css';
 // Create a wrapper component to handle location changes
 function AppContent() {
   const location = useLocation();
-  const [activeTab, setActiveTab] = useState(
-    location.pathname === '/3d-analyzer' ? '3d' : 'shingle'
-  );
+  const [activeTab, setActiveTab] = useState(() => {
+    if (location.pathname === '/3d-analyzer') {
+      return '3d';
+    } else if (location.pathname === '/enhanced-analyzer') {
+      return 'enhanced';
+    } else {
+      return 'shingle';
+    }
+  });
 
   // Update active tab when location changes
   useEffect(() => {
     if (location.pathname === '/3d-analyzer') {
       setActiveTab('3d');
+    } else if (location.pathname === '/enhanced-analyzer') {
+      setActiveTab('enhanced');
     } else {
       setActiveTab('shingle');
     }
@@ -27,41 +35,32 @@ function AppContent() {
       <header className="App-header">
         <h1>Roofing Shingle Analyzer</h1>
         <p>Upload a shingle image or multiple roof images for AI-powered analysis</p>
-        
+
         <nav className="main-nav">
-          <Link 
-            to="/" 
+          <Link
+            to="/"
             className={`nav-link ${activeTab === 'shingle' ? 'active' : ''}`}
             onClick={() => setActiveTab('shingle')}
           >
             Single Shingle Analysis
           </Link>
-          <Link 
-            to="/3d-analyzer" 
+          <Link
+            to="/3d-analyzer"
             className={`nav-link ${activeTab === '3d' ? 'active' : ''}`}
             onClick={() => setActiveTab('3d')}
           >
             3D Roof Analysis
           </Link>
-              <Link 
-  to="/enhanced-analyzer" 
-  className={`nav-link ${activeTab === 'enhanced' ? 'active' : ''}`}
-  onClick={() => setActiveTab('enhanced')}
->
-  Enhanced Roof Analysis
-</Link>
-    useEffect(() => {
-  if (location.pathname === '/3d-analyzer') {
-    setActiveTab('3d');
-  } else if (location.pathname === '/enhanced-analyzer') {
-    setActiveTab('enhanced');
-  } else {
-    setActiveTab('shingle');
-  }
-}, [location]);
+          <Link
+            to="/enhanced-analyzer"
+            className={`nav-link ${activeTab === 'enhanced' ? 'active' : ''}`}
+            onClick={() => setActiveTab('enhanced')}
+          >
+            Enhanced Roof Analysis
+          </Link>
         </nav>
       </header>
-      
+
       <main>
         <Routes>
           <Route path="/" element={<ShingleAnalyzer />} />
@@ -69,7 +68,7 @@ function AppContent() {
           <Route path="/enhanced-analyzer" element={<EnhancedShingleAnalyzer />} />
         </Routes>
       </main>
-      
+
       <footer className="App-footer">
         <div className="footer-content">
           <p className="footer-item">
