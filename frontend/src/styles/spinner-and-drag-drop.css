@@ -51,6 +51,9 @@
 .loading-progress {
   width: 100%;
   margin-top: 1rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
 }
 
 .progress-bar {
@@ -59,6 +62,7 @@
   border-radius: 5px;
   overflow: hidden;
   margin-bottom: 0.5rem;
+  width: 100%;
 }
 
 .progress-fill {
@@ -69,9 +73,15 @@
 }
 
 .progress-percentage {
-  font-size: 0.85rem;
-  color: var(--gray-600);
-  text-align: right;
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--primary);
+  text-align: center;
+  margin-top: 0.5rem;
+  background-color: rgba(67, 97, 238, 0.05);
+  padding: 0.35rem 0.75rem;
+  border-radius: 12px;
+  display: inline-block;
 }
 
 .loading-text {
@@ -367,5 +377,11 @@
   
   .loading-text {
     font-size: 1.1rem;
+  }
+  
+  /* Make percentage more visible on mobile */
+  .progress-percentage {
+    font-size: 0.95rem;
+    padding: 0.3rem 0.65rem;
   }
 }
