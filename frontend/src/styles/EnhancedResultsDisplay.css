@@ -1,0 +1,818 @@
+/* src/styles/EnhancedResultsDisplay.css */
+
+.enhanced-results-container {
+  background-color: var(--white);
+  border-radius: var(--border-radius);
+  box-shadow: var(--card-shadow);
+  margin-top: 2rem;
+  overflow: hidden;
+}
+
+/* Tabs Navigation */
+.results-tabs {
+  display: flex;
+  background-color: var(--gray-100);
+  border-bottom: 1px solid var(--gray-200);
+  overflow-x: auto;
+  scrollbar-width: none; /* Firefox */
+}
+
+.results-tabs::-webkit-scrollbar {
+  display: none; /* Chrome, Safari, Edge */
+}
+
+.tab-button {
+  padding: 1rem 1.5rem;
+  background: none;
+  border: none;
+  border-bottom: 3px solid transparent;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--gray-700);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.tab-button:hover {
+  color: var(--primary);
+  background-color: rgba(67, 97, 238, 0.05);
+}
+
+.tab-button.active {
+  color: var(--primary);
+  border-bottom-color: var(--primary);
+  background-color: var(--white);
+}
+
+/* Tab Content */
+.results-content {
+  padding: 1.5rem;
+}
+
+/* Material Specifications Tab */
+.specifications-container {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.material-overview {
+  background-color: var(--gray-100);
+  padding: 1.5rem;
+  border-radius: var(--border-radius);
+  margin-bottom: 1rem;
+}
+
+.material-name {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--gray-900);
+  margin: 0 0 0.75rem 0;
+}
+
+.manufacturer, .product-line {
+  display: flex;
+  align-items: center;
+  margin-bottom: 0.5rem;
+}
+
+.manufacturer-label, .product-line-label {
+  font-weight: 500;
+  margin-right: 0.5rem;
+  color: var(--gray-700);
+}
+
+.specifications-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+  gap: 1rem;
+}
+
+.spec-item {
+  background-color: var(--gray-100);
+  padding: 1rem;
+  border-radius: var(--border-radius);
+  display: flex;
+  flex-direction: column;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.spec-item:hover {
+  transform: translateY(-3px);
+  box-shadow: var(--card-shadow);
+}
+
+.spec-label {
+  font-size: 0.85rem;
+  color: var(--gray-600);
+  margin-bottom: 0.5rem;
+}
+
+.spec-value {
+  font-weight: 600;
+  color: var(--gray-800);
+}
+
+.colors-item {
+  grid-column: 1 / -1;
+}
+
+.colors-container {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.color-tag {
+  background-color: var(--gray-200);
+  padding: 0.25rem 0.75rem;
+  border-radius: 1rem;
+  font-size: 0.85rem;
+  font-weight: 500;
+}
+
+/* Damage Assessment Tab */
+.damage-assessment-container {
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+}
+
+.damage-summary {
+  background-color: var(--gray-100);
+  padding: 1.5rem;
+  border-radius: var(--border-radius);
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.condition-indicator {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.5rem 1rem;
+  border-radius: 2rem;
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+  align-self: flex-start;
+}
+
+.condition-excellent {
+  background-color: rgba(6, 214, 160, 0.2);
+  color: #06d6a0;
+}
+
+.condition-good {
+  background-color: rgba(125, 207, 182, 0.2);
+  color: #3bb273;
+}
+
+.condition-fair {
+  background-color: rgba(255, 209, 102, 0.2);
+  color: #f0a202;
+}
+
+.condition-poor {
+  background-color: rgba(239, 71, 111, 0.2);
+  color: #ef476f;
+}
+
+.condition-critical {
+  background-color: rgba(220, 53, 69, 0.2);
+  color: #dc3545;
+}
+
+.condition-label {
+  margin-right: 0.5rem;
+  font-weight: 500;
+}
+
+.damage-severity {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.severity-label {
+  font-weight: 500;
+  color: var(--gray-700);
+}
+
+.severity-meter {
+  height: 0.75rem;
+  background-color: var(--gray-200);
+  border-radius: 0.375rem;
+  overflow: hidden;
+  position: relative;
+}
+
+.severity-fill {
+  height: 100%;
+  transition: width 0.5s ease;
+}
+
+.severity-value {
+  position: absolute;
+  right: 0.5rem;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--white);
+  text-shadow: 0 0 2px rgba(0, 0, 0, 0.5);
+}
+
+.damage-types-overview {
+  margin-top: 0.5rem;
+}
+
+.damage-types-label {
+  font-weight: 500;
+  color: var(--gray-700);
+  display: block;
+  margin-bottom: 0.5rem;
+}
+
+.damage-types-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.damage-type-tag {
+  background-color: var(--gray-200);
+  padding: 0.25rem 0.75rem;
+  border-radius: 1rem;
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: var(--gray-800);
+}
+
+.damage-description-overview {
+  margin-top: 1rem;
+  font-style: italic;
+  color: var(--gray-700);
+}
+
+.damage-details {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.damage-details-title {
+  font-size: 1.25rem;
+  font-weight: 600;
+  margin-bottom: 1rem;
+  position: relative;
+  padding-left: 1rem;
+}
+
+.damage-details-title::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0.25rem;
+  width: 4px;
+  height: 1rem;
+  background-color: var(--primary);
+  border-radius: 2px;
+}
+
+.damage-type-item {
+  background-color: var(--gray-100);
+  border-radius: var(--border-radius);
+  overflow: hidden;
+}
+
+.damage-type-item.severe {
+  border-left: 4px solid var(--danger);
+}
+
+.damage-type-item.moderate {
+  border-left: 4px solid var(--warning);
+}
+
+.damage-type-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem;
+  background-color: rgba(0, 0, 0, 0.03);
+}
+
+.damage-type-header h4 {
+  margin: 0;
+  font-size: 1.1rem;
+  font-weight: 600;
+}
+
+.severity-badge {
+  background-color: var(--gray-200);
+  padding: 0.25rem 0.75rem;
+  border-radius: 1rem;
+  font-size: 0.85rem;
+  font-weight: 500;
+}
+
+.damage-description {
+  padding: 1rem;
+  margin: 0;
+  color: var(--gray-700);
+}
+
+.damage-coverage {
+  padding: 0 1rem 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.coverage-label {
+  font-weight: 500;
+  font-size: 0.9rem;
+  color: var(--gray-700);
+}
+
+.coverage-bar-container {
+  height: 0.75rem;
+  background-color: var(--gray-200);
+  border-radius: 0.375rem;
+  overflow: hidden;
+  position: relative;
+}
+
+.coverage-bar {
+  height: 100%;
+  background-color: var(--primary);
+  transition: width 0.5s ease;
+}
+
+.coverage-percentage {
+  position: absolute;
+  right: 0.5rem;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--white);
+  text-shadow: 0 0 2px rgba(0, 0, 0, 0.5);
+}
+
+.damage-causes {
+  margin-top: 1rem;
+}
+
+.damage-causes h4 {
+  font-size: 1rem;
+  font-weight: 600;
+  margin-bottom: 0.75rem;
+}
+
+.causes-container {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.cause-tag {
+  background-color: var(--gray-200);
+  padding: 0.25rem 0.75rem;
+  border-radius: 1rem;
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: var(--gray-800);
+}
+
+.damage-timeframe {
+  margin-top: 1rem;
+}
+
+.timeframe-label {
+  font-weight: 500;
+  color: var(--gray-700);
+  margin-right: 0.5rem;
+}
+
+.damage-flags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+.flag-item {
+  display: flex;
+  align-items: center;
+  background-color: var(--gray-100);
+  padding: 0.5rem 1rem;
+  border-radius: var(--border-radius);
+}
+
+.flag-icon {
+  margin-right: 0.5rem;
+  font-size: 1.25rem;
+}
+
+.flag-text {
+  font-weight: 500;
+}
+
+.flag-item.weather-related {
+  background-color: rgba(79, 192, 255, 0.1);
+  color: #4fc0ff;
+}
+
+.flag-item.structural-concerns {
+  background-color: rgba(239, 71, 111, 0.1);
+  color: #ef476f;
+}
+
+.flag-item.progressive-issues {
+  background-color: rgba(255, 152, 0, 0.1);
+  color: #ff9800;
+}
+
+.recommended-action {
+  margin-top: 1.5rem;
+  background-color: rgba(67, 97, 238, 0.1);
+  padding: 1rem;
+  border-radius: var(--border-radius);
+}
+
+.recommended-action h4 {
+  font-size: 1rem;
+  font-weight: 600;
+  margin-top: 0;
+  margin-bottom: 0.75rem;
+  color: var(--primary);
+}
+
+.recommended-action p {
+  margin: 0;
+  color: var(--gray-800);
+}
+
+/* Repair Assessment Tab */
+.repair-assessment-container {
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+}
+
+.repair-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.recommendation-indicator, .urgency-indicator {
+  flex: 1;
+  min-width: 250px;
+  padding: 1rem;
+  border-radius: var(--border-radius);
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.recommendation-indicator {
+  background-color: var(--gray-100);
+}
+
+.recommendation-no-action-needed {
+  background-color: rgba(6, 214, 160, 0.1);
+}
+
+.recommendation-minor-repairs {
+  background-color: rgba(255, 209, 102, 0.1);
+}
+
+.recommendation-major-repairs {
+  background-color: rgba(255, 152, 0, 0.1);
+}
+
+.recommendation-partial-replacement {
+  background-color: rgba(239, 71, 111, 0.1);
+}
+
+.recommendation-full-replacement {
+  background-color: rgba(220, 53, 69, 0.1);
+}
+
+.recommendation-label, .urgency-label {
+  font-size: 0.9rem;
+  color: var(--gray-600);
+}
+
+.recommendation-value, .urgency-value {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: var(--gray-800);
+}
+
+.urgency-none {
+  background-color: rgba(6, 214, 160, 0.1);
+}
+
+.urgency-low {
+  background-color: rgba(125, 207, 182, 0.1);
+}
+
+.urgency-moderate {
+  background-color: rgba(255, 209, 102, 0.1);
+}
+
+.urgency-high {
+  background-color: rgba(255, 152, 0, 0.1);
+}
+
+.urgency-emergency {
+  background-color: rgba(239, 71, 111, 0.1);
+}
+
+.repair-details {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.repair-difficulty, .diy-feasibility {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.difficulty-label, .diy-label {
+  font-weight: 500;
+  color: var(--gray-700);
+}
+
+.cost-estimates {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+.cost-item {
+  flex: 1;
+  min-width: 250px;
+  background-color: var(--gray-100);
+  padding: 1rem;
+  border-radius: var(--border-radius);
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.cost-label {
+  font-size: 0.9rem;
+  color: var(--gray-600);
+}
+
+.cost-value {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: var(--gray-800);
+}
+
+.special-considerations {
+  margin-top: 1.5rem;
+}
+
+.special-considerations h4 {
+  font-size: 1.1rem;
+  font-weight: 600;
+  margin-bottom: 1rem;
+}
+
+.considerations-list {
+  list-style-type: none;
+  padding: 0;
+  margin: 0;
+}
+
+.consideration-item {
+  position: relative;
+  padding-left: 1.5rem;
+  margin-bottom: 0.75rem;
+  color: var(--gray-700);
+}
+
+.consideration-item::before {
+  content: "•";
+  position: absolute;
+  left: 0.5rem;
+  color: var(--primary);
+  font-weight: bold;
+}
+
+/* Metadata Tab */
+.metadata-container {
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+}
+
+.confidence-section {
+  background-color: var(--gray-100);
+  padding: 1.5rem;
+  border-radius: var(--border-radius);
+}
+
+.confidence-section h4 {
+  font-size: 1.1rem;
+  font-weight: 600;
+  margin-top: 0;
+  margin-bottom: 1rem;
+}
+
+.confidence-meter {
+  height: 1rem;
+  background-color: var(--gray-200);
+  border-radius: 0.5rem;
+  overflow: hidden;
+  position: relative;
+}
+
+.confidence-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #ef476f 0%, #ffd166 50%, #06d6a0 100%);
+  transition: width 0.5s ease;
+}
+
+.confidence-value {
+  position: absolute;
+  right: 0.5rem;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--white);
+  text-shadow: 0 0 2px rgba(0, 0, 0, 0.5);
+}
+
+.visibility-section {
+  background-color: var(--gray-100);
+  padding: 1.5rem;
+  border-radius: var(--border-radius);
+}
+
+.visibility-section h4 {
+  font-size: 1.1rem;
+  font-weight: 600;
+  margin-top: 0;
+  margin-bottom: 1rem;
+}
+
+.visibility-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.visibility-label {
+  font-weight: 500;
+  color: var(--gray-700);
+}
+
+.limitation-notes {
+  margin-top: 1.5rem;
+}
+
+.limitation-notes h4 {
+  font-size: 1rem;
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+}
+
+.limitation-notes p {
+  margin: 0;
+  color: var(--gray-700);
+  font-style: italic;
+}
+
+.additional-inspection {
+  margin-top: 1.5rem;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  background-color: rgba(255, 209, 102, 0.1);
+  padding: 1rem;
+  border-radius: var(--border-radius);
+}
+
+.inspection-icon {
+  font-size: 1.5rem;
+}
+
+.inspection-text {
+  font-weight: 500;
+  color: var(--gray-800);
+}
+
+/* Raw Data Tab */
+.raw-data-container {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.raw-data-container h3 {
+  font-size: 1.25rem;
+  font-weight: 600;
+  margin: 0;
+}
+
+.raw-data-code {
+  background-color: var(--gray-100);
+  border-radius: var(--border-radius);
+  padding: 1rem;
+  overflow: auto;
+}
+
+.raw-data-code pre {
+  margin: 0;
+  font-family: 'Courier New', monospace;
+  font-size: 0.85rem;
+  color: var(--gray-800);
+  white-space: pre-wrap;
+}
+
+/* Error States */
+.no-results {
+  padding: 2rem;
+  text-align: center;
+  color: var(--gray-600);
+  font-weight: 500;
+}
+
+.error-parsing {
+  padding: 2rem;
+  background-color: rgba(239, 71, 111, 0.05);
+  border-radius: var(--border-radius);
+}
+
+.error-parsing h3 {
+  color: var(--danger);
+  margin-top: 0;
+}
+
+.error-parsing pre {
+  background-color: rgba(0, 0, 0, 0.05);
+  padding: 1rem;
+  border-radius: var(--border-radius);
+  overflow: auto;
+  max-height: 300px;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .tab-button {
+    padding: 0.75rem 1rem;
+    font-size: 0.85rem;
+  }
+  
+  .results-content {
+    padding: 1rem;
+  }
+  
+  .specifications-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .material-name {
+    font-size: 1.25rem;
+  }
+  
+  .damage-summary, .repair-summary {
+    flex-direction: column;
+  }
+  
+  .damage-type-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  
+  .severity-badge {
+    margin-top: 0.5rem;
+  }
+  
+  .repair-difficulty, .diy-feasibility {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  
+  .additional-inspection {
+    flex-direction: column;
+    align-items: flex-start;
+    text-align: center;
+  }
+  
+  .raw-data-code {
+    max-height: 300px;
+  }
+}
