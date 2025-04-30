@@ -1,7 +1,7 @@
 // src/components/EnhancedShingleAnalyzer.jsx
 import { useState } from 'react';
 import EnhancedResultsDisplay from './EnhancedResultsDisplay';
-import responseUtils from '../utils/responseUtils';
+import DebugHelper from './DebugHelper';
 import '../styles/ShingleAnalyzer.css';
 import '../styles/EnhancedResultsDisplay.css';
 
@@ -10,10 +10,11 @@ const EnhancedShingleAnalyzer = () => {
   const [preview, setPreview] = useState(null);
   const [analyzing, setAnalyzing] = useState(false);
   const [results, setResults] = useState(null);
+  const [rawResponse, setRawResponse] = useState(null);
   const [error, setError] = useState(null);
-  const [enhancedMetrics, setEnhancedMetrics] = useState(null);
+  const [showDebug, setShowDebug] = useState(false);
 
-  // Handle file change event - preserves your existing validation pattern
+  // Handle file change event
   const handleFileChange = (e) => {
     const selectedFile = e.target.files[0];
     
@@ -37,45 +38,12 @@ const EnhancedShingleAnalyzer = () => {
       
       // Reset previous results
       setResults(null);
+      setRawResponse(null);
       setError(null);
-      setEnhancedMetrics(null);
     }
   };
 
-  // Extract structured data from API response
-  const extractStructuredData = (apiResponse) => {
-    try {
-      // If already processed
-      if (apiResponse.specifications) {
-        return apiResponse.specifications;
-      }
-      
-      // Extract from raw API response
-      if (apiResponse.choices && apiResponse.choices[0] && apiResponse.choices[0].message) {
-        const content = apiResponse.choices[0].message.content;
-        
-        // Look for JSON in content
-        const jsonMatch = content.match(/\{[\s\S]*\}/);
-        if (jsonMatch) {
-          return JSON.parse(jsonMatch[0]);
-        }
-        
-        // Try to parse whole content as JSON
-        try {
-          return JSON.parse(content);
-        } catch (e) {
-          console.warn("Could not parse content as JSON", e);
-        }
-      }
-      
-      return null;
-    } catch (error) {
-      console.error("Error extracting structured data:", error);
-      return null;
-    }
-  };
-
-  // Analyze the image - matches your existing pattern for image processing
+  // Analyze the image
   const analyzeImage = async () => {
     if (!file) {
       setError("Please upload an image first");
@@ -84,6 +52,8 @@ const EnhancedShingleAnalyzer = () => {
 
     setAnalyzing(true);
     setError(null);
+    setResults(null);
+    setRawResponse(null);
     
     try {
       // Convert image to base64
@@ -95,7 +65,9 @@ const EnhancedShingleAnalyzer = () => {
           // Extract base64 data without the prefix
           const base64Image = reader.result.split(',')[1];
           
-          // Call your backend API - using the exact same endpoint pattern
+          console.log("Sending API request...");
+          
+          // Call your backend API
           const response = await fetch('https://shingle-analyzer-cf8f8df19174.herokuapp.com/api/analyze-shingle', {
             method: 'POST',
             headers: {
@@ -106,303 +78,46 @@ const EnhancedShingleAnalyzer = () => {
             })
           });
           
+          console.log("API response received, parsing JSON...");
           const data = await response.json();
+          console.log("JSON parsed successfully");
           
           if (response.ok) {
-            // Store raw API response
-            setResults(data);
+            console.log("Response OK, storing results");
             
-            // Extract structured data
-            const structuredData = extractStructuredData(data);
+            // Store the raw API response for debugging
+            setRawResponse(data);
             
-            if (structuredData) {
-              // Calculate enhanced metrics
-              calculateEnhancedMetrics(structuredData);
+            // Process the response for display
+            if (data.choices && data.choices[0] && data.choices[0].message) {
+              console.log("Message found in response");
+              setResults(data);
             } else {
-              console.warn("Could not extract structured data from API response");
+              console.error("No message found in API response:", data);
+              throw new Error("Unexpected API response structure");
             }
           } else {
+            console.error("API error:", data);
             throw new Error(`API error: ${data.error?.message || data.error || 'Unknown error'}`);
           }
           setAnalyzing(false);
         } catch (error) {
+          console.error("Error in API call:", error);
           setError("Error calling API: " + error.message);
           setAnalyzing(false);
         }
       };
       
       reader.onerror = (error) => {
+        console.error("Error reading file:", error);
         setError("Error reading file: " + error.message);
         setAnalyzing(false);
       };
     } catch (err) {
+      console.error("General error:", err);
       setError("Error analyzing image: " + err.message);
       setAnalyzing(false);
     }
-  };
-
-  // Calculate enhanced metrics from the analysis results
-  const calculateEnhancedMetrics = (analysisData) => {
-    try {
-      if (!analysisData) return;
-      
-      // Extract main sections with support for both naming conventions
-      const materialSpecification = analysisData['MATERIAL SPECIFICATION'] || analysisData.materialSpecification || {};
-      const damageAssessment = analysisData['DAMAGE ASSESSMENT'] || analysisData.damageAssessment || {};
-      
-      // Calculate total damage percentage
-      let totalDamagePercentage = 0;
-      const damageTypes = [
-        'granuleLoss',
-        'cracking',
-        'curling',
-        'blistering',
-        'missingShingles',
-        'hailDamage',
-        'waterDamage',
-        'algaeGrowth'
-      ];
-      
-      for (const type of damageTypes) {
-        if (damageAssessment[type] && damageAssessment[type].present) {
-          let coverage = damageAssessment[type].coverage;
-          
-          // Handle coverage as either number or string percentage
-          if (typeof coverage === 'string') {
-            const match = coverage.match(/(\d+)/);
-            if (match) {
-              coverage = parseInt(match[1], 10);
-            } else {
-              coverage = 0;
-            }
-          }
-          
-          totalDamagePercentage += coverage || 0;
-        }
-      }
-      
-      // Apply overlap adjustment (assuming 15% overlap between damage types)
-      if (totalDamagePercentage > 0) {
-        const damageTypesCount = damageTypes.filter(type => 
-          damageAssessment[type] && damageAssessment[type].present
-        ).length;
-        
-        if (damageTypesCount > 1) {
-          const overlapAdjustment = (damageTypesCount - 1) * 0.15;
-          totalDamagePercentage = Math.min(100, totalDamagePercentage * (1 - overlapAdjustment));
-        }
-      }
-      
-      // Calculate remaining roof life
-      let remainingLifeYears = "Unknown";
-      let remainingLifePercentage = 100;
-      
-      // Extract lifespan
-      let lifespan = 0;
-      if (materialSpecification.lifespan) {
-        const match = materialSpecification.lifespan.match(/(\d+)/);
-        if (match) {
-          lifespan = parseInt(match[1], 10);
-          if (materialSpecification.lifespan.includes('-')) {
-            // Handle range format (e.g., "20-25 years")
-            const range = materialSpecification.lifespan.match(/(\d+)-(\d+)/);
-            if (range && range.length >= 3) {
-              lifespan = (parseInt(range[1], 10) + parseInt(range[2], 10)) / 2;
-            }
-          }
-        }
-      }
-      
-      // Default lifespan based on material if not specified
-      if (!lifespan) {
-        const material = (materialSpecification.material || '').toLowerCase();
-        if (material.includes('asphalt')) {
-          lifespan = materialSpecification.materialSubtype?.toLowerCase().includes('architectural') ? 30 : 20;
-        } else if (material.includes('metal')) {
-          lifespan = 50;
-        } else if (material.includes('wood')) {
-          lifespan = 25;
-        } else if (material.includes('clay') || material.includes('slate')) {
-          lifespan = 75;
-        } else {
-          lifespan = 25; // Default
-        }
-      }
-      
-      // Extract age
-      let age = 0;
-      if (materialSpecification.estimatedAge) {
-        const match = materialSpecification.estimatedAge.match(/(\d+)/);
-        if (match) {
-          age = parseInt(match[1], 10);
-          if (materialSpecification.estimatedAge.includes('-')) {
-            // Handle range format (e.g., "5-7 years")
-            const range = materialSpecification.estimatedAge.match(/(\d+)-(\d+)/);
-            if (range && range.length >= 3) {
-              age = (parseInt(range[1], 10) + parseInt(range[2], 10)) / 2;
-            }
-          }
-        }
-      }
-      
-      // Calculate remaining life
-      if (lifespan > 0) {
-        // Base calculation
-        let remainingYears = Math.max(0, lifespan - age);
-        
-        // Adjust for damage severity
-        const severity = damageAssessment.damageSeverity || 0;
-        let damageMultiplier = 1;
-        
-        if (severity >= 8) {
-          damageMultiplier = 0.3; // 70% reduction
-        } else if (severity >= 6) {
-          damageMultiplier = 0.6; // 40% reduction
-        } else if (severity >= 4) {
-          damageMultiplier = 0.8; // 20% reduction
-        } else if (severity >= 2) {
-          damageMultiplier = 0.9; // 10% reduction
-        }
-        
-        remainingYears = Math.round(remainingYears * damageMultiplier);
-        remainingLifePercentage = Math.round((remainingYears / lifespan) * 100);
-        remainingLifeYears = remainingYears > 0 ? `${remainingYears} years` : 'Less than 1 year';
-      }
-      
-      // Determine repair priority
-      let repairPriority = "Unknown";
-      const severity = damageAssessment.damageSeverity || 0;
-      const structuralConcerns = damageAssessment.structuralConcerns || false;
-      const progressiveIssues = damageAssessment.progressiveIssues || false;
-      const waterDamage = damageAssessment.waterDamage?.present || false;
-      
-      if (structuralConcerns) {
-        repairPriority = "Immediate - Structural concerns present";
-      } else if (waterDamage && progressiveIssues) {
-        repairPriority = "High - Water damage with progressive deterioration";
-      } else if (severity >= 8) {
-        repairPriority = "Urgent - Severe damage requiring prompt attention";
-      } else if (severity >= 6) {
-        repairPriority = "High - Significant damage requiring timely repairs";
-      } else if (severity >= 4) {
-        repairPriority = "Moderate - Address within 3-6 months";
-      } else if (severity >= 2) {
-        repairPriority = "Low - Monitor and address during routine maintenance";
-      } else {
-        repairPriority = "None - No significant issues detected";
-      }
-      
-      // Extract or estimate costs
-      const repairAssessment = analysisData['REPAIR ASSESSMENT'] || analysisData.repairAssessment || {};
-      const repairCost = repairAssessment.anticipatedRepairCost || "$0 - $0";
-      const replacementCost = repairAssessment.anticipatedReplacementCost || "$0 - $0";
-      
-      // Get recommendation
-      let recommendation = repairAssessment.repairRecommendation || "Monitor";
-      let reasoning = "Based on the analysis of the roof condition.";
-      
-      if (severity <= 2 && totalDamagePercentage < 5) {
-        recommendation = "Monitor";
-        reasoning = "Minor damage detected. Monitor the condition and address any changes during routine maintenance.";
-      } else if (severity >= 7 || totalDamagePercentage > 35 || remainingLifePercentage < 25) {
-        recommendation = "Replace";
-        reasoning = "Significant damage detected or limited remaining lifespan. Replacement is recommended for long-term value.";
-      } else if (severity >= 4 || totalDamagePercentage > 15) {
-        recommendation = "Repair";
-        reasoning = "Moderate damage detected. Repairs are recommended to prevent further deterioration.";
-      }
-      
-      // Set enhanced metrics
-      setEnhancedMetrics({
-        totalDamagePercentage: Math.round(totalDamagePercentage),
-        remainingLife: {
-          years: remainingLifeYears,
-          percentage: Math.min(100, Math.max(0, remainingLifePercentage))
-        },
-        repairPriority,
-        costEstimates: {
-          repair: repairCost,
-          replacement: replacementCost
-        },
-        repairOrReplace: {
-          recommendation,
-          reasoning
-        }
-      });
-    } catch (error) {
-      console.error("Error calculating enhanced metrics:", error);
-      // Provide default metrics in case of error
-      setEnhancedMetrics({
-        totalDamagePercentage: 0,
-        remainingLife: {
-          years: "Unknown",
-          percentage: 100
-        },
-        repairPriority: "Unknown",
-        costEstimates: {
-          repair: "$0 - $0",
-          replacement: "$0 - $0"
-        },
-        repairOrReplace: {
-          recommendation: "Unknown",
-          reasoning: "Could not determine recommendation due to processing error."
-        }
-      });
-    }
-  };
-
-  // Render enhanced metrics summary
-  const renderEnhancedMetrics = () => {
-    if (!enhancedMetrics) return null;
-    
-    return (
-      <div className="enhanced-metrics-container">
-        <h3 className="section-subtitle">Enhanced Analysis Metrics</h3>
-        
-        <div className="metrics-grid">
-          <div className="metric-item">
-            <span className="metric-label">Total Affected Area</span>
-            <span className="metric-value">{enhancedMetrics.totalDamagePercentage}%</span>
-          </div>
-          
-          <div className="metric-item">
-            <span className="metric-label">Remaining Roof Life</span>
-            <span className="metric-value">{enhancedMetrics.remainingLife.years}</span>
-            <div className="progress-bar-container">
-              <div 
-                className="progress-bar" 
-                style={{ width: `${enhancedMetrics.remainingLife.percentage}%` }}
-              ></div>
-            </div>
-          </div>
-          
-          <div className="metric-item">
-            <span className="metric-label">Repair Priority</span>
-            <span className="metric-value">{enhancedMetrics.repairPriority}</span>
-          </div>
-          
-          <div className="metric-item">
-            <span className="metric-label">Estimated Repair Cost</span>
-            <span className="metric-value">{enhancedMetrics.costEstimates.repair}</span>
-          </div>
-          
-          <div className="metric-item">
-            <span className="metric-label">Estimated Replacement Cost</span>
-            <span className="metric-value">{enhancedMetrics.costEstimates.replacement}</span>
-          </div>
-          
-          <div className="metric-item recommendation-item">
-            <span className="metric-label">Recommendation</span>
-            <span className="metric-value recommendation-value">
-              {enhancedMetrics.repairOrReplace.recommendation}
-            </span>
-            <p className="recommendation-reasoning">
-              {enhancedMetrics.repairOrReplace.reasoning}
-            </p>
-          </div>
-        </div>
-      </div>
-    );
   };
 
   return (
@@ -458,6 +173,22 @@ const EnhancedShingleAnalyzer = () => {
             </>
           )}
         </button>
+        
+        {/* Debug toggle button */}
+        <button
+          onClick={() => setShowDebug(!showDebug)}
+          style={{
+            marginTop: '10px',
+            padding: '5px 10px',
+            backgroundColor: '#f0f0f0',
+            border: '1px solid #ccc',
+            borderRadius: '4px',
+            cursor: 'pointer',
+            fontSize: '12px'
+          }}
+        >
+          {showDebug ? 'Hide Debug Info' : 'Show Debug Info'}
+        </button>
       </div>
       
       {error && (
@@ -465,6 +196,10 @@ const EnhancedShingleAnalyzer = () => {
           <span className="error-icon"></span>
           {error}
         </div>
+      )}
+      
+      {showDebug && rawResponse && (
+        <DebugHelper apiResponse={rawResponse} />
       )}
       
       {results && (
@@ -482,9 +217,6 @@ const EnhancedShingleAnalyzer = () => {
               <p className="method-value">OpenAI Vision API</p>
             </div>
           </div>
-          
-          {/* Enhanced Metrics Display */}
-          {enhancedMetrics && renderEnhancedMetrics()}
           
           {/* Enhanced Results Display */}
           <EnhancedResultsDisplay results={results} />
