@@ -1,124 +1,116 @@
 // src/components/EnhancedResultsDisplay.jsx
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import '../styles/EnhancedResultsDisplay.css';
 
 const EnhancedResultsDisplay = ({ results }) => {
   const [activeTab, setActiveTab] = useState('specifications');
+  const [parsedData, setParsedData] = useState(null);
+  
+  // Parse data when results change
+  useEffect(() => {
+    if (results) {
+      const extractedData = extractStructuredData(results);
+      console.log("Extracted data:", extractedData);
+      setParsedData(extractedData);
+    }
+  }, [results]);
   
   // Early return if no results
   if (!results) {
     return <div className="no-results">No analysis results available</div>;
   }
   
-  // Extract data from the response
-  const extractStructuredData = () => {
+  // Early return if parsing failed
+  if (!parsedData) {
+    return (
+      <div className="error-parsing">
+        <h3>Processing Results</h3>
+        <p>The analysis is still being processed or couldn't be parsed.</p>
+        <pre>{JSON.stringify(results, null, 2).substring(0, 500)}...</pre>
+      </div>
+    );
+  }
+  
+  // Extract structured data from API response
+  function extractStructuredData(apiResponse) {
     try {
-      // If the data has already been processed by ShingleAnalyzer component
-      if (results.specifications) {
-        return results.specifications;
+      console.log("Extracting from:", apiResponse);
+      
+      // Check if apiResponse already contains the parsed data
+      if (apiResponse.specifications) {
+        return apiResponse.specifications;
       }
       
-      // Try to parse from the OpenAI API response
-      if (results.choices && results.choices[0] && results.choices[0].message) {
-        const content = results.choices[0].message.content;
+      // Extract from raw API response
+      if (apiResponse.choices && apiResponse.choices[0] && apiResponse.choices[0].message) {
+        const content = apiResponse.choices[0].message.content;
+        console.log("Processing content:", content.substring(0, 100));
         
-        // Try to extract JSON
+        // Try to find JSON in the content
         const jsonMatch = content.match(/\{[\s\S]*\}/);
         if (jsonMatch) {
-          return JSON.parse(jsonMatch[0]);
+          try {
+            const parsed = JSON.parse(jsonMatch[0]);
+            console.log("Found JSON in content:", Object.keys(parsed));
+            return parsed;
+          } catch (e) {
+            console.error("Failed to parse JSON from match:", e);
+          }
         }
         
         // Try to parse the whole content
         try {
-          return JSON.parse(content);
+          const parsed = JSON.parse(content);
+          console.log("Parsed whole content as JSON:", Object.keys(parsed));
+          return parsed;
         } catch (e) {
-          console.warn("Unable to parse content as JSON");
+          console.error("Failed to parse whole content as JSON:", e);
         }
+        
+        // If we get here, we couldn't parse as JSON - try looking for structured text
+        console.log("Looking for structured text");
+        return null;
       }
       
+      console.log("No message content found in API response");
       return null;
     } catch (error) {
       console.error("Error extracting data:", error);
       return null;
     }
-  };
-  
-  const data = extractStructuredData();
-  
-  // If we couldn't extract structured data
-  if (!data) {
-    return (
-      <div className="error-parsing">
-        <h3>Error Parsing Results</h3>
-        <p>There was a problem interpreting the analysis results.</p>
-        <pre>{JSON.stringify(results, null, 2)}</pre>
-      </div>
-    );
   }
   
-  // Helper function to safely access nested properties
-  const get = (obj, path, defaultValue = 'Unknown') => {
-    const keys = Array.isArray(path) ? path : path.split('.');
-    let result = obj;
-    
-    for (const key of keys) {
-      if (result === null || result === undefined || typeof result !== 'object') {
-        return defaultValue;
-      }
-      result = result[key];
-    }
-    
-    return result !== null && result !== undefined ? result : defaultValue;
+  // Helper function to get severity color
+  const getSeverityColor = (severity) => {
+    if (severity <= 3) return 'var(--success)';
+    if (severity <= 6) return 'var(--warning)';
+    if (severity <= 8) return '#FF9800'; // Orange
+    return 'var(--danger)';
   };
   
-  // Extract each section of data
-  const materialSpec = data['MATERIAL SPECIFICATION'] || data.materialSpecification || {};
-  const damageAssessment = data['DAMAGE ASSESSMENT'] || data.damageAssessment || {};
-  const repairAssessment = data['REPAIR ASSESSMENT'] || data.repairAssessment || {};
-  const metadata = data['METADATA'] || data.metadata || {};
-  
-  // Helper function to render damage type details
-  const renderDamageType = (type, data) => {
-    if (!data || !data.present) return null;
-    
-    // Parse coverage from string to number if needed
-    let coverageValue = data.coverage;
-    if (typeof coverageValue === 'string') {
-      const match = coverageValue.match(/(\d+)/);
-      if (match) {
-        coverageValue = parseInt(match[1], 10);
-      } else {
-        coverageValue = 0;
-      }
+  // Helper function to safely get property allowing for different naming conventions
+  const getProp = (obj, propName, defaultValue = 'Unknown') => {
+    // Check for the property directly
+    if (obj[propName] !== undefined && obj[propName] !== null) {
+      return obj[propName];
     }
     
-    return (
-      <div className={`damage-type-item ${data.severity > 5 ? 'severe' : 'moderate'}`}>
-        <div className="damage-type-header">
-          <h4>{type}</h4>
-          <div className="severity-badge">
-            Severity: {data.severity}/10
-          </div>
-        </div>
-        <p className="damage-description">{data.description}</p>
-        <div className="damage-coverage">
-          <div className="coverage-label">Coverage:</div>
-          <div className="coverage-bar-container">
-            <div 
-              className="coverage-bar" 
-              style={{ width: `${coverageValue}%` }}
-            />
-            <div className="coverage-percentage">{coverageValue}%</div>
-          </div>
-        </div>
-      </div>
-    );
+    // Check for uppercase version (MATERIAL SPECIFICATION vs materialSpecification)
+    const uppercaseProp = propName.toUpperCase().replace(/([A-Z])/g, ' $1').trim();
+    if (obj[uppercaseProp] !== undefined && obj[uppercaseProp] !== null) {
+      return obj[uppercaseProp];
+    }
+    
+    return defaultValue;
   };
 
-  // Render functions for each tab
+  // Render specifications tab
   const renderSpecifications = () => {
+    const materialSpec = parsedData["MATERIAL SPECIFICATION"] || parsedData.materialSpecification || {};
+    console.log("Material specs:", materialSpec);
+    
     // Handle manufacturer as string or array
-    let manufacturerValue = materialSpec.manufacturer;
+    let manufacturerValue = materialSpec.manufacturer || "Unknown";
     if (Array.isArray(manufacturerValue)) {
       manufacturerValue = manufacturerValue.join(', ');
     }
@@ -133,13 +125,13 @@ const EnhancedResultsDisplay = ({ results }) => {
       <div className="specifications-container">
         <div className="material-overview">
           <h3 className="material-name">{materialSpec.name || "Unknown Material"}</h3>
-          {manufacturerValue && (
+          {manufacturerValue && manufacturerValue !== "Unknown" && (
             <div className="manufacturer">
               <span className="manufacturer-label">Manufacturer:</span>
               <span className="manufacturer-value">{manufacturerValue}</span>
             </div>
           )}
-          {materialSpec.productLine && (
+          {materialSpec.productLine && materialSpec.productLine !== "Unknown" && (
             <div className="product-line">
               <span className="product-line-label">Product Line:</span>
               <span className="product-line-value">{materialSpec.productLine}</span>
@@ -221,8 +213,50 @@ const EnhancedResultsDisplay = ({ results }) => {
       </div>
     );
   };
+  
+  // Helper function to render damage type details
+  const renderDamageType = (type, data) => {
+    if (!data || !data.present) return null;
+    
+    // Parse coverage from string to number if needed
+    let coverageValue = data.coverage;
+    if (typeof coverageValue === 'string') {
+      const match = coverageValue.match(/(\d+)/);
+      if (match) {
+        coverageValue = parseInt(match[1], 10);
+      } else {
+        coverageValue = 0;
+      }
+    }
+    
+    return (
+      <div className={`damage-type-item ${data.severity > 5 ? 'severe' : 'moderate'}`}>
+        <div className="damage-type-header">
+          <h4>{type}</h4>
+          <div className="severity-badge">
+            Severity: {data.severity}/10
+          </div>
+        </div>
+        <p className="damage-description">{data.description}</p>
+        <div className="damage-coverage">
+          <div className="coverage-label">Coverage:</div>
+          <div className="coverage-bar-container">
+            <div 
+              className="coverage-bar" 
+              style={{ width: `${coverageValue}%` }}
+            />
+            <div className="coverage-percentage">{coverageValue}%</div>
+          </div>
+        </div>
+      </div>
+    );
+  };
 
+  // Render damage assessment tab
   const renderDamageAssessment = () => {
+    const damageAssessment = parsedData["DAMAGE ASSESSMENT"] || parsedData.damageAssessment || {};
+    console.log("Damage assessment:", damageAssessment);
+    
     // Parse damage types
     let damageTypes = damageAssessment.damageTypes || [];
     if (!Array.isArray(damageTypes)) {
@@ -282,7 +316,7 @@ const EnhancedResultsDisplay = ({ results }) => {
           {renderDamageType("Algae Growth", damageAssessment.algaeGrowth)}
           
           {/* Show additional metadata if available */}
-          {damageAssessment.likelyDamageCauses && damageAssessment.likelyDamageCauses.length > 0 && (
+          {damageAssessment.likelyDamageCauses && (
             <div className="damage-causes">
               <h4>Likely Causes:</h4>
               <div className="causes-container">
@@ -338,7 +372,11 @@ const EnhancedResultsDisplay = ({ results }) => {
     );
   };
 
+  // Render repair assessment tab
   const renderRepairAssessment = () => {
+    const repairAssessment = parsedData["REPAIR ASSESSMENT"] || parsedData.repairAssessment || {};
+    console.log("Repair assessment:", repairAssessment);
+    
     // Parse special considerations
     let specialConsiderations = repairAssessment.specialConsiderations || [];
     if (!Array.isArray(specialConsiderations)) {
@@ -397,7 +435,11 @@ const EnhancedResultsDisplay = ({ results }) => {
     );
   };
 
+  // Render metadata tab
   const renderMetadata = () => {
+    const metadata = parsedData["METADATA"] || parsedData.metadata || {};
+    console.log("Metadata:", metadata);
+    
     // Parse visibility estimate
     let visibleSection = metadata.visibleSectionEstimate || "0%";
     if (typeof visibleSection === 'number') {
@@ -449,23 +491,20 @@ const EnhancedResultsDisplay = ({ results }) => {
     );
   };
 
+  // Render raw data tab
   const renderRawData = () => {
     return (
       <div className="raw-data-container">
         <h3>Raw Analysis Data</h3>
         <div className="raw-data-code">
-          <pre>{JSON.stringify(data, null, 2)}</pre>
+          <pre>{JSON.stringify(parsedData, null, 2)}</pre>
+        </div>
+        <div className="raw-data-code">
+          <h4>Original API Response:</h4>
+          <pre>{JSON.stringify(results, null, 2).substring(0, 2000)}...</pre>
         </div>
       </div>
     );
-  };
-
-  // Helper function to get severity color
-  const getSeverityColor = (severity) => {
-    if (severity <= 3) return 'var(--success)';
-    if (severity <= 6) return 'var(--warning)';
-    if (severity <= 8) return '#FF9800'; // Orange
-    return 'var(--danger)';
   };
 
   return (
