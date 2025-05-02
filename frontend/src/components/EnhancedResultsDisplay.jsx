@@ -84,98 +84,225 @@ const EnhancedResultsDisplay = ({ results }) => {
     }
   }, [results]); */
 
-// In EnhancedResultsDisplay.jsx - Update the useEffect for parsing
-
-useEffect(() => {
+  useEffect(() => {
   if (results) {
-    // Add some debug logging
-    console.log("Processing results:", 
-                results.choices?.[0]?.message ? "Has message content" : "No message content");
+    console.log("Processing API results...");
     
     // First extract and normalize the JSON structure
     let extractedData = null;
     
     try {
-      // Check if we already have parsed results from backend
+      // APPROACH 1: Check if we already have parsed results from backend
       if (results.parsedResults) {
         console.log("Using pre-parsed results from backend");
         extractedData = normalizeApiResponse(results.parsedResults);
-      } else if (results.choices && results.choices[0] && results.choices[0].message) {
-        // Try to extract from message content
+      } 
+      // APPROACH 2: Extract from message content
+      else if (results.choices && results.choices[0] && results.choices[0].message) {
         const content = results.choices[0].message.content;
+        console.log("Content type:", typeof content);
         
-        // Try to parse directly if it's already an object
+        // 2A: Try to parse directly if it's already an object
         if (typeof content === 'object' && content !== null) {
           console.log("Content is already an object");
           extractedData = normalizeApiResponse(content);
-        } else if (typeof content === 'string') {
-          // Try to extract JSON from the content string
+        } 
+        // 2B: Extract JSON from string content
+        else if (typeof content === 'string') {
+          console.log("Attempting to extract JSON from string content");
+          
+          // Try standard extraction first
           const extractedJson = extractJsonFromContent(content);
           if (extractedJson) {
+            console.log("Standard JSON extraction successful");
             extractedData = normalizeApiResponse(extractedJson);
+          } 
+          // Try repair if standard extraction failed
+          else {
+            console.log("Standard extraction failed, attempting repair...");
+            const repairedContent = attemptJsonRepair(content);
+            const extractedRepairedJson = extractJsonFromContent(repairedContent);
+            
+            if (extractedRepairedJson) {
+              console.log("Extraction after repair successful");
+              extractedData = normalizeApiResponse(extractedRepairedJson);
+            } 
+            // Last resort: Try to extract largest JSON object
+            else {
+              console.log("Repair extraction failed, trying aggressive extraction...");
+              const aggressiveJson = extractJsonAggressively(content);
+              
+              if (aggressiveJson) {
+                console.log("Aggressive extraction successful");
+                extractedData = normalizeApiResponse(aggressiveJson);
+              }
+            }
           }
         }
       }
-      
-      // Validate that we got meaningful data
-      const isDataValid = extractedData && 
-        (Object.keys(extractedData.materialSpecification).length > 0 || 
-         Object.keys(extractedData.damageAssessment).length > 0);
-      
-      if (!isDataValid) {
-        console.warn("Extracted data is empty or invalid, using raw response directly");
-        
-        // Last resort: try to normalize the entire response object
+      // APPROACH 3: If all else fails, try to normalize the entire results object
+      if (!extractedData) {
+        console.log("All extraction methods failed, trying to normalize entire results object");
         extractedData = normalizeApiResponse(results);
-        
-        // If still no valid data, create minimal structure with metadata
-        if (!extractedData || 
-            (Object.keys(extractedData.materialSpecification).length === 0 && 
-             Object.keys(extractedData.damageAssessment).length === 0)) {
-          console.warn("Creating fallback data structure");
-          extractedData = {
-            materialSpecification: { name: "Data extraction issue - please try again" },
-            damageAssessment: {},
-            repairAssessment: {},
-            metadata: { 
-              confidenceScore: 0,
-              visibilityQuality: "Unknown",
-              limitationNotes: "Data could not be properly extracted from the API response.",
-              additionalInspectionNeeded: true
-            }
-          };
-        }
       }
-    } catch (error) {
-      console.error("Error during JSON extraction:", error);
       
-      // Provide a minimal fallback structure
-      extractedData = {
-        materialSpecification: { name: "Error extracting data" },
-        damageAssessment: {},
+      // DATA VALIDATION: Ensure we have meaningful data
+      const hasData = extractedData && 
+                     (Object.keys(extractedData.materialSpecification || {}).length > 0 || 
+                      Object.keys(extractedData.damageAssessment || {}).length > 0);
+      
+      if (!hasData) {
+        console.warn("Extraction resulted in empty data, creating fallback structure");
+        extractedData = {
+          materialSpecification: { name: "Data extraction issue - please try again" },
+          damageAssessment: {},
+          repairAssessment: {},
+          metadata: { 
+            confidenceScore: 0,
+            visibilityQuality: "Unknown",
+            limitationNotes: "Could not properly extract data from the API response.",
+            additionalInspectionNeeded: true
+          }
+        };
+      }
+      
+      // Set parsed data state
+      console.log("Final extracted data:", extractedData);
+      setParsedData(extractedData);
+      
+      // CALCULATED METRICS HANDLING: Set calculated metrics from API response
+      if (extractedData && 
+          (extractedData.CALCULATED_METRICS || 
+           extractedData.calculatedMetrics)) {
+        
+        // Get metrics from proper property (handle case variations)
+        const metrics = extractedData.CALCULATED_METRICS || 
+                       extractedData.calculatedMetrics || 
+                       {};
+        
+        console.log("Found AI-calculated metrics:", metrics);
+        
+        // Validate and normalize damage percentage
+        let damagePercentage = safeGet(metrics, 'totalDamagePercentage', 0);
+        if (typeof damagePercentage === 'string') {
+          // Extract number from string like "45%" or "about 45%"
+          const match = damagePercentage.match(/(\d+)/);
+          damagePercentage = match ? parseInt(match[1], 10) : 0;
+        }
+        damagePercentage = !isNaN(damagePercentage) ? 
+          Math.min(100, Math.max(0, Number(damagePercentage))) : 0;
+        
+        // Validate remaining life structure
+        let remainingLife = safeGet(metrics, 'remainingLife', { years: 'Unknown', percentage: 0 });
+        if (typeof remainingLife !== 'object' || remainingLife === null) {
+          remainingLife = { years: 'Unknown', percentage: 0 };
+        } else {
+          // Ensure years property exists
+          if (!remainingLife.years) {
+            remainingLife.years = 'Unknown';
+          }
+          
+          // Normalize percentage to be a valid number between 0-100
+          let percentage = remainingLife.percentage;
+          if (typeof percentage === 'string') {
+            const match = percentage.match(/(\d+)/);
+            percentage = match ? parseInt(match[1], 10) : 0;
+          }
+          remainingLife.percentage = !isNaN(percentage) ? 
+            Math.min(100, Math.max(0, Number(percentage))) : 0;
+        }
+        
+        // Validate repair priority
+        let repairPriority = safeGet(metrics, 'repairPriority', 'Unknown');
+        
+        // Validate cost estimates
+        let costEstimates = safeGet(metrics, 'costEstimates', { repair: 'Unknown', replacement: 'Unknown' });
+        if (typeof costEstimates !== 'object' || costEstimates === null) {
+          costEstimates = { repair: 'Unknown', replacement: 'Unknown' };
+        }
+        
+        // Validate repair recommendation
+        let repairRecommendation = safeGet(metrics, 'repairRecommendation', { 
+          recommendation: 'Unknown', 
+          reasoning: 'Unknown' 
+        });
+        
+        if (typeof repairRecommendation !== 'object' || repairRecommendation === null) {
+          repairRecommendation = { recommendation: 'Unknown', reasoning: 'Unknown' };
+        } else {
+          // Ensure required properties exist
+          if (!repairRecommendation.recommendation) {
+            repairRecommendation.recommendation = 'Unknown';
+          }
+          if (!repairRecommendation.reasoning) {
+            repairRecommendation.reasoning = 'Unknown';
+          }
+        }
+        
+        // Set the validated and normalized metrics
+        setCalculatedMetrics({
+          damagePercentage,
+          remainingLife,
+          repairPriority,
+          costEstimates,
+          repairRecommendation
+        });
+        
+        console.log("Using AI-calculated metrics with validation");
+      } 
+      // FALLBACK: Use default values if no calculated metrics found
+      else {
+        console.warn("No AI-calculated metrics found, using defaults");
+        setCalculatedMetrics({
+          damagePercentage: 0,
+          remainingLife: { years: 'Unknown', percentage: 0 },
+          repairPriority: 'Unknown',
+          costEstimates: { repair: 'Unknown', replacement: 'Unknown' },
+          repairRecommendation: { recommendation: 'Unknown', reasoning: 'Unknown' }
+        });
+      }
+    } 
+    // ERROR HANDLING: Comprehensive error handling for the entire process
+    catch (error) {
+      console.error("Error processing API response:", error);
+      
+      // Set fallback values for both data structures
+      setParsedData({
+        materialSpecification: { 
+          name: "Error processing response data",
+          material: "Unknown",
+          materialSubtype: "Error occurred during extraction"
+        },
+        damageAssessment: {
+          overallCondition: "Unknown",
+          description: "An error occurred while processing the analysis results."
+        },
         repairAssessment: {},
-        metadata: { 
+        metadata: {
           confidenceScore: 0,
-          limitationNotes: "An unexpected error occurred processing the API response.",
+          visibilityQuality: "Unknown",
+          limitationNotes: `Error: ${error.message}. Please try again.`,
           additionalInspectionNeeded: true
         }
-      };
-    }
-    
-    console.log("Final extracted data:", 
-                Object.keys(extractedData.materialSpecification).length > 0 ? "Has material data" : "No material data",
-                Object.keys(extractedData.damageAssessment).length > 0 ? "Has damage data" : "No damage data");
-    
-    setParsedData(extractedData);
-    
-    // Calculate additional metrics using responseUtils once we have data
-    if (extractedData && (
-        Object.keys(extractedData.materialSpecification).length > 0 || 
-        Object.keys(extractedData.damageAssessment).length > 0)) {
-      calculateMetrics(extractedData);
+      });
+      
+      setCalculatedMetrics({
+        damagePercentage: 0,
+        remainingLife: { years: 'Unknown', percentage: 0 },
+        repairPriority: 'Unknown',
+        costEstimates: { repair: 'Unknown', replacement: 'Unknown' },
+        repairRecommendation: { 
+          recommendation: 'Unknown', 
+          reasoning: 'An error occurred while processing the results.' 
+        }
+      });
     }
   }
 }, [results]);
+
+// In EnhancedResultsDisplay.jsx - Update the useEffect for parsing
+
+
   
   // Calculate metrics using responseUtils
   const calculateMetrics = (data) => {
