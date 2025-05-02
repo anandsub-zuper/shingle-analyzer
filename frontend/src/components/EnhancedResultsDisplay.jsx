@@ -11,13 +11,13 @@ import {
   extractJsonAggressively  
 } from '../utils/jsonUtils';
 
-import {
+/*import {
   calculateTotalDamagePercentage,
   calculateRemainingLife,
   getRepairPriority,
   estimateRepairCosts,
   getRepairOrReplaceRecommendation
-} from '../utils/responseUtils';
+} from '../utils/responseUtils';*/
 
 const EnhancedResultsDisplay = ({ results }) => {
   const [activeTab, setActiveTab] = useState('specifications');
