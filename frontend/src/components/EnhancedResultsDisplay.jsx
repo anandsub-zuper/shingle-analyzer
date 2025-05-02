@@ -79,9 +79,9 @@ const EnhancedResultsDisplay = ({ results }) => {
       setParsedData(extractedData);
       
       // Calculate additional metrics using responseUtils once we have data
-      if (extractedData) {
+      /*if (extractedData) {
         calculateMetrics(extractedData);
-      }
+      }*/
     }
   }, [results]); */
 
@@ -306,7 +306,7 @@ const EnhancedResultsDisplay = ({ results }) => {
 
   
   // Calculate metrics using responseUtils
-  const calculateMetrics = (data) => {
+ /* const calculateMetrics = (data) => {
     const { materialSpecification, damageAssessment } = data;
     
     // Only proceed with calculations if we have meaningful data
@@ -347,7 +347,7 @@ const EnhancedResultsDisplay = ({ results }) => {
     } catch (error) {
       console.error("Error calculating metrics:", error);
     }
-  };
+  };*/
   
   // Early return if no results
   if (!results) {
