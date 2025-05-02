@@ -7,7 +7,8 @@ import {
   extractJsonFromContent, 
   normalizeApiResponse, 
   safeGet,
-  attemptJsonRepair
+  attemptJsonRepair,
+  extractJsonAggressively  
 } from '../utils/jsonUtils';
 
 import {
