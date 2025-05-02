@@ -32,59 +32,6 @@ const EnhancedResultsDisplay = ({ results }) => {
   });
   
   // Parse data when results change
-  /*useEffect(() => {
-    if (results) {
-      // First extract and normalize the JSON structure
-      let extractedData = null;
-      
-      // Check if we already have parsed results from backend
-      if (results.parsedResults) {
-        console.log("Using pre-parsed results from backend");
-        extractedData = normalizeApiResponse(results.parsedResults);
-      } else if (results.choices && results.choices[0] && results.choices[0].message) {
-        // Try to extract from message content
-        const content = results.choices[0].message.content;
-        
-        // Try to parse directly if it's already an object
-        if (typeof content === 'object' && content !== null) {
-          console.log("Content is already an object");
-          extractedData = normalizeApiResponse(content);
-        } else if (typeof content === 'string') {
-          // Try to extract JSON from the content string
-          const extractedJson = extractJsonFromContent(content);
-          if (extractedJson) {
-            extractedData = normalizeApiResponse(extractedJson);
-          } else {
-            // Try repair as a last resort
-            const repairedJson = attemptJsonRepair(content);
-            const extractedRepairedJson = extractJsonFromContent(repairedJson);
-            if (extractedRepairedJson) {
-              extractedData = normalizeApiResponse(extractedRepairedJson);
-            }
-          }
-        }
-      }
-      
-      if (!extractedData) {
-        // Last resort fallback
-        extractedData = {
-          materialSpecification: { name: "Unknown" },
-          damageAssessment: { overallCondition: "Unknown" },
-          repairAssessment: {},
-          metadata: {}
-        };
-      }
-      
-      console.log("Extracted data:", extractedData);
-      setParsedData(extractedData);
-      
-      // Calculate additional metrics using responseUtils once we have data
-      /*if (extractedData) {
-        calculateMetrics(extractedData);
-      }*/
-    }
-  }, [results]); */
-
   useEffect(() => {
   if (results) {
     console.log("Processing API results...");
