@@ -1,4 +1,9 @@
 steps:
+  # Install dependencies
+  - name: 'node:18'
+    entrypoint: npm
+    args: ['install', '--production']
+  
   # Build the container image
   - name: 'gcr.io/cloud-builders/docker'
     args: ['build', '-t', 'gcr.io/$PROJECT_ID/analyzeshingle', '.']
