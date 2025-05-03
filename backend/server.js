@@ -290,12 +290,13 @@ app.get('/', (req, res) => {
 });
 
 // Start the server with enhanced error handling
-app.listen(PORT, () => {
+app.listen(PORT, '0.0.0.0', () => {
   console.log(JSON.stringify({
     message: `Server running on port ${PORT}`,
     timestamp: new Date().toISOString(),
     environment: process.env.NODE_ENV || 'development'
   }));
+});
 }).on('error', (err) => {
   console.error(JSON.stringify({
     message: 'Server failed to start',
