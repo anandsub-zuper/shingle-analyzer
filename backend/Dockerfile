@@ -1,4 +1,4 @@
-FROM node:18-alpine
+FROM gcr.io/google-appengine/nodejs
 
 WORKDIR /app
 
