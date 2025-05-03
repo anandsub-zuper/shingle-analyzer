@@ -2,7 +2,7 @@
   "name": "test-backend",
   "version": "1.0.0",
   "description": "test",
-  "main": "server.js",
+  "main": "test-server.js",
   "scripts": {
     "start": "node test-server.js",
     "dev": "node test-server.js"
