@@ -17,10 +17,10 @@ steps:
       - '--image'
       - 'gcr.io/$PROJECT_ID/analyzeshingle'
       - '--region'
-      - 'us-central1'  # Change this to your preferred region
+      - 'us-west1'
       - '--platform'
       - 'managed'
-      - '--allow-unauthenticated'  # Remove if you don't want public access
+      - '--allow-unauthenticated'
 
 images:
   - 'gcr.io/$PROJECT_ID/analyzeshingle'
