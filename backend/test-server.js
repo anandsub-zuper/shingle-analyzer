@@ -7,8 +7,15 @@ app.get('/', (req, res) => {
   res.send('Hello from Cloud Run!');
 });
 
-// Important: bind to 0.0.0.0
-console.log('Starting server...');
-app.listen(PORT, '0.0.0.0', () => {
-  console.log(`Server listening on 0.0.0.0:${PORT}`);
-});
+// Enhanced logging
+console.log('Starting server initialization...');
+console.log(`PORT environment variable: ${process.env.PORT}`);
+
+try {
+  // Only listen once!
+  app.listen(PORT, '0.0.0.0', () => {
+    console.log(`Server successfully listening on 0.0.0.0:${PORT}`);
+  });
+} catch (error) {
+  console.error('Failed to start server:', error);
+}
