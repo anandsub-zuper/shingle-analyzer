@@ -580,40 +580,31 @@ const HomeLocationDetector = ({ onLocationDetected }) => {
                     )}
 
                     {/* Property Features */}
-                    {propertyData.features &&
-                      Object.keys(propertyData.features).length > 0 && (
-                        <div className="property-features">
-                          <h5>Features</h5>
-                          <div className="features-list">
-                            {featuresToShow?.map(([key, value]) => (
+                    {propertyData.features && (
+                      <div className="data-section property-features">
+                        <h4>Features</h4>
+                        <div className="features-list">
+                          {Object.entries(propertyData.features).map(
+                            ([key, value]) => (
                               <div className="feature-item" key={key}>
                                 <span className="feature-name">
                                   {key
                                     .replace(/([A-Z])/g, ' $1')
                                     .replace(/^./, (str) => str.toUpperCase())}
                                 </span>
-                                <span className="feature-value">{value}</span>
+                                <span className="feature-value">
+                                  {typeof value === 'boolean'
+                                    ? value
+                                      ? 'Yes'
+                                      : 'No'
+                                    : value}
+                                </span>
                               </div>
-                            ))}
-                            {hasMoreFeatures && !showAllFeatures && (
-                              <div
-                                className="feature-more"
-                                onClick={() => setShowAllFeatures(true)}
-                              >
-                                + {displayedFeatures.length - 6} more
-                              </div>
-                            )}
-                            {hasMoreFeatures && showAllFeatures && (
-                              <div
-                                className="feature-more"
-                                onClick={() => setShowAllFeatures(false)}
-                              >
-                                Show less
-                              </div>
-                            )}
-                          </div>
+                            ),
+                          )}
                         </div>
-                      )}
+                      </div>
+                    )}
                   </div>
                 </div>
               )}
@@ -1084,7 +1075,7 @@ const HomeLocationDetector = ({ onLocationDetected }) => {
           font-size: 0.9rem;
           color: var(--gray-800);
           margin-bottom: 0.25rem;
-display: flex;
+          display: flex;
           flex-wrap: wrap;
           gap: 0.5rem;
         }
