@@ -1,11 +1,15 @@
 import React, { useState, useEffect } from 'react';
 
 const HomeLocationDetector = ({ onLocationDetected }) => {
-  const [status, setStatus] = useState('idle'); // idle, detecting, success, error
+  const [status, setStatus] = useState('idle');
   const [coordinates, setCoordinates] = useState(null);
   const [address, setAddress] = useState(null);
   const [error, setError] = useState(null);
   const [expanded, setExpanded] = useState(false);
+  const [propertyData, setPropertyData] = useState(null);
+  const [propertyLoading, setPropertyLoading] = useState(false);
+  const [propertyError, setPropertyError] = useState(null);
+  const [showAllFeatures, setShowAllFeatures] = useState(false);
 
   const detectLocation = async () => {
     try {
@@ -24,10 +28,10 @@ const HomeLocationDetector = ({ onLocationDetected }) => {
       if (onLocationDetected) {
         onLocationDetected({
           coordinates: coords,
-          address: addressData
+          address: addressData,
         });
       }
-      
+
       // If we have an address, fetch property data
       if (addressData && addressData.fullAddress) {
         fetchPropertyData(addressData.fullAddress);
@@ -49,37 +53,39 @@ const HomeLocationDetector = ({ onLocationDetected }) => {
         reject(new Error("Geolocation is not supported by your browser"));
         return;
       }
-      
+
       // Create a timeout for the geolocation request
       const timeoutId = setTimeout(() => {
         reject(new Error("Location request timed out. Please try again."));
       }, 15000); // 15 seconds timeout
-      
+
       navigator.geolocation.getCurrentPosition(
         (position) => {
           // Clear the timeout since we got a successful response
           clearTimeout(timeoutId);
-          
+
           const { latitude, longitude, accuracy } = position.coords;
           resolve({
             latitude,
             longitude,
             accuracy,
-            timestamp: position.timestamp
+            timestamp: position.timestamp,
           });
         },
         (error) => {
           // Clear the timeout since we got an error response
           clearTimeout(timeoutId);
-          
+
           // Provide user-friendly error messages
           let errorMessage;
           switch (error.code) {
             case error.PERMISSION_DENIED:
-              errorMessage = "Location access was denied. Please allow location access in your browser settings.";
+              errorMessage =
+                "Location access was denied. Please allow location access in your browser settings.";
               break;
             case error.POSITION_UNAVAILABLE:
-              errorMessage = "Location information is unavailable. Please try again later.";
+              errorMessage =
+                "Location information is unavailable. Please try again later.";
               break;
             case error.TIMEOUT:
               errorMessage = "Location request timed out. Please try again.";
@@ -87,14 +93,14 @@ const HomeLocationDetector = ({ onLocationDetected }) => {
             default:
               errorMessage = `Error getting location: ${error.message}`;
           }
-          
+
           reject(new Error(errorMessage));
         },
         {
           enableHighAccuracy: true,
           timeout: 10000,
-          maximumAge: 0
-        }
+          maximumAge: 0,
+        },
       );
     });
   };
@@ -104,28 +110,28 @@ const HomeLocationDetector = ({ onLocationDetected }) => {
     try {
       // Generate a cache-busting timestamp to prevent caching issues
       const timestamp = new Date().getTime();
-      
+
       // Use OpenStreetMap's Nominatim service for reverse geocoding
       const response = await fetch(
         `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&zoom=18&addressdetails=1&_=${timestamp}`,
         {
           headers: {
             // Nominatim requires a User-Agent header
-            'User-Agent': 'RoofAnalyzerApp/1.0'
-          }
-        }
+            'User-Agent': 'RoofAnalyzerApp/1.0',
+          },
+        },
       );
-      
+
       if (!response.ok) {
         throw new Error(`API error: ${response.status}`);
       }
-      
+
       const data = await response.json();
-      
+
       if (!data.address) {
         throw new Error("No address data returned");
       }
-      
+
       // Map Nominatim address components to our expected format
       const components = {
         street_number: data.address.house_number,
@@ -133,75 +139,77 @@ const HomeLocationDetector = ({ onLocationDetected }) => {
         locality: data.address.city || data.address.town || data.address.village,
         administrative_area_level_1: data.address.state,
         postal_code: data.address.postcode,
-        country: data.address.country
+        country: data.address.country,
       };
-      
+
       return {
         fullAddress: data.display_name,
-        components: components
+        components: components,
       };
     } catch (error) {
       console.warn('Error getting address:', error);
-      
+
       // Fallback to coordinates as address if geocoding fails
       return {
         fullAddress: `${latitude.toFixed(6)}, ${longitude.toFixed(6)}`,
-        components: {}
+        components: {},
       };
     }
   };
 
-  // States for property data
-  const [propertyData, setPropertyData] = useState(null);
-  const [propertyLoading, setPropertyLoading] = useState(false);
-  const [propertyError, setPropertyError] = useState(null);
-  
   // Format a coordinate value
   const formatCoordinate = (value) => {
     return value ? value.toFixed(6) : '0.000000';
   };
-  
+
   // Fetch property data from RentCast API
   const fetchPropertyData = async (addressStr) => {
     if (!addressStr) return;
-    
+
     setPropertyLoading(true);
     setPropertyError(null);
-    
+
     try {
       // Replace with your actual API key
-      const apiKey = process.env.REACT_APP_RENTCAST_API_KEY || 'your_rentcast_api_key';
-      
+      const apiKey = process.env.REACT_APP_RENTCAST_API_KEY;
+      if (!apiKey) {
+        console.warn(
+          "RentCast API key is missing. Please set the REACT_APP_RENTCAST_API_KEY environment variable.",
+        );
+        setPropertyError("API key is missing.  Property data cannot be loaded."); //Set Error message
+        setPropertyLoading(false);
+        return;
+      }
+
       // Encode the address for URL
       const encodedAddress = encodeURIComponent(addressStr);
-      
+
       // Make the API request
       const response = await fetch(
         `https://api.rentcast.io/v1/properties?address=${encodedAddress}`,
         {
           method: 'GET',
           headers: {
-            'Accept': 'application/json',
-            'X-Api-Key': apiKey
-          }
-        }
+            Accept: 'application/json',
+            'X-Api-Key': apiKey,
+          },
+        },
       );
-      
+
       if (!response.ok) {
         throw new Error(`API error: ${response.status}`);
       }
-      
+
       const data = await response.json();
-      
+
       // Save the property data
       setPropertyData(data);
       console.log('Property data:', data);
-      
+
       // Also fetch rent estimate if property data was found
       if (data && data.id) {
-        fetchRentEstimate(data.id);
+        fetchRentEstimate(data.id, apiKey);
       }
-      
     } catch (error) {
       console.error('Error fetching property data:', error);
       setPropertyError(error.message);
@@ -209,43 +217,75 @@ const HomeLocationDetector = ({ onLocationDetected }) => {
       setPropertyLoading(false);
     }
   };
-  
+
   // Fetch rent estimate from RentCast API
-  const fetchRentEstimate = async (propertyId) => {
+  const fetchRentEstimate = async (propertyId, apiKey) => {
     if (!propertyId) return;
-    
+
     try {
-      // Replace with your actual API key
-      const apiKey = process.env.REACT_APP_RENTCAST_API_KEY || 'your_rentcast_api_key';
-      
+      if (!apiKey) {
+        console.warn(
+          "RentCast API key is missing. Please set the REACT_APP_RENTCAST_API_KEY environment variable.",
+        );
+        return; // Don't throw error,  just log to console.
+      }
+
       // Make the API request
       const response = await fetch(
         `https://api.rentcast.io/v1/avm/rent/long-term?propertyId=${propertyId}`,
         {
           method: 'GET',
           headers: {
-            'Accept': 'application/json',
-            'X-Api-Key': apiKey
-          }
-        }
+            Accept: 'application/json',
+            'X-Api-Key': apiKey,
+          },
+        },
       );
-      
+
       if (!response.ok) {
         throw new Error(`API error: ${response.status}`);
       }
-      
+
       const data = await response.json();
-      
+
       // Add rent estimate to property data
-      setPropertyData(prevData => ({
+      setPropertyData((prevData) => ({
         ...prevData,
-        rentEstimate: data
+        rentEstimate: data,
       }));
-      
     } catch (error) {
       console.error('Error fetching rent estimate:', error);
       // Not setting error state here as it's a non-critical enhancement
     }
+  };
+
+  const displayedFeatures =
+    propertyData?.features &&
+    Object.entries(propertyData.features).filter(
+      ([_, value]) => value !== null && value !== "",
+    );
+
+  const featuresToShow = showAllFeatures
+    ? displayedFeatures
+    : displayedFeatures?.slice(0, 6);
+  const hasMoreFeatures = displayedFeatures?.length > 6;
+
+  // Function to handle map viewing with improved accuracy
+  const viewOnMap = () => {
+    if (coordinates) {
+      // Use a more precise zoom level (e.g., 18 or higher)
+      const zoom = 18;
+      const mapUrl = `https://www.google.com/maps/@${coordinates.latitude},${coordinates.longitude},${zoom}z`;
+      window.open(mapUrl, '_blank');
+    }
+  };
+
+  // Helper function to get property type with fallback
+  const getPropertyType = () => {
+    if (propertyData?.propertyType) {
+      return propertyData.propertyType;
+    }
+    return "Property"; // Default to "Property" or you can use "Unknown Type"
   };
 
   return (
@@ -255,21 +295,27 @@ const HomeLocationDetector = ({ onLocationDetected }) => {
           <span className="location-icon">📍</span> Home Location
           <span className={`expand-icon ${expanded ? 'expanded' : ''}`}>▼</span>
         </h3>
-        
+
         {status === 'success' && !expanded && (
           <div className="location-preview">
-            {address?.fullAddress || `${formatCoordinate(coordinates?.latitude)}, ${formatCoordinate(coordinates?.longitude)}`}
+            {address?.fullAddress ||
+              `${formatCoordinate(coordinates?.latitude)}, ${formatCoordinate(
+                coordinates?.longitude,
+              )}`}
           </div>
         )}
       </div>
-      
+
       {expanded && (
         <div className="location-content">
           {status === 'idle' && (
             <div className="location-prompt">
-              <p>Detecting your home location can help provide more accurate roof analysis results.</p>
-              <button 
-                onClick={detectLocation} 
+              <p>
+                Detecting your home location can help provide more accurate roof
+                analysis results.
+              </p>
+              <button
+                onClick={detectLocation}
                 className="detect-button"
                 disabled={status === 'detecting'}
               >
@@ -284,19 +330,16 @@ const HomeLocationDetector = ({ onLocationDetected }) => {
               </button>
             </div>
           )}
-          
+
           {error && (
             <div className="error-message">
               <span className="error-icon">⚠️</span> {error}
-              <button 
-                onClick={detectLocation} 
-                className="retry-button"
-              >
+              <button onClick={detectLocation} className="retry-button">
                 Try Again
               </button>
             </div>
           )}
-          
+
           {status === 'success' && (
             <div className="location-details">
               <div className="location-data">
@@ -305,15 +348,19 @@ const HomeLocationDetector = ({ onLocationDetected }) => {
                   <div className="coordinate-grid">
                     <div className="coordinate-item">
                       <span className="coordinate-label">Latitude</span>
-                      <span className="coordinate-value">{formatCoordinate(coordinates?.latitude)}</span>
+                      <span className="coordinate-value">
+                        {formatCoordinate(coordinates?.latitude)}
+                      </span>
                     </div>
                     <div className="coordinate-item">
                       <span className="coordinate-label">Longitude</span>
-                      <span className="coordinate-value">{formatCoordinate(coordinates?.longitude)}</span>
+                      <span className="coordinate-value">
+                        {formatCoordinate(coordinates?.longitude)}
+                      </span>
                     </div>
                   </div>
                 </div>
-                
+
                 {address && (
                   <div className="data-section">
                     <h4>Address</h4>
@@ -324,19 +371,25 @@ const HomeLocationDetector = ({ onLocationDetected }) => {
                           {address.components.locality && (
                             <div className="address-component">
                               <span className="component-label">City</span>
-                              <span className="component-value">{address.components.locality}</span>
+                              <span className="component-value">
+                                {address.components.locality}
+                              </span>
                             </div>
                           )}
                           {address.components.administrative_area_level_1 && (
                             <div className="address-component">
                               <span className="component-label">State</span>
-                              <span className="component-value">{address.components.administrative_area_level_1}</span>
+                              <span className="component-value">
+                                {address.components.administrative_area_level_1}
+                              </span>
                             </div>
                           )}
                           {address.components.postal_code && (
                             <div className="address-component">
                               <span className="component-label">ZIP</span>
-                              <span className="component-value">{address.components.postal_code}</span>
+                              <span className="component-value">
+                                {address.components.postal_code}
+                              </span>
                             </div>
                           )}
                         </div>
@@ -344,145 +397,172 @@ const HomeLocationDetector = ({ onLocationDetected }) => {
                     </div>
                   </div>
                 )}
-                
-                {/* Property Data Section */}
-                {propertyLoading && (
-                  <div className="data-section">
-                    <h4>Property Data</h4>
-                    <div className="loading-indicator">
-                      <div className="spinner"></div>
-                      <span>Loading property data...</span>
-                    </div>
+              </div>
+
+              {/* Property Data Section */}
+              {propertyLoading && (
+                <div className="data-section">
+                  <h4>Property Data</h4>
+                  <div className="loading-indicator">
+                    <div className="spinner"></div>
+                    <span>Loading property data...</span>
                   </div>
-                )}
-                
-                {propertyError && (
-                  <div className="data-section">
-                    <h4>Property Data</h4>
-                    <div className="property-error">
-                      <p>Error loading property data: {propertyError}</p>
-                    </div>
+                </div>
+              )}
+
+              {propertyError && (
+                <div className="data-section">
+                  <h4>Property Data</h4>
+                  <div className="property-error">
+                    <p>Error loading property data: {propertyError}</p>
                   </div>
-                )}
-                
-                {propertyData && !propertyLoading && !propertyError && (
-                  <div className="data-section property-section">
-                    <h4>Property Information</h4>
-                    <div className="property-info-container">
-                      <div className="property-overview">
-                        <div className="property-type-badge">
-                          {propertyData.propertyType || "Unknown Type"}
+                </div>
+              )}
+
+              {propertyData && !propertyLoading && !propertyError && (
+                <div className="data-section property-section">
+                  <h4>Property Information</h4>
+                  <div className="property-info-container">
+                    <div className="property-overview">
+                      <div className="property-type-badge">
+                        {getPropertyType()}
+                      </div>
+
+                      {propertyData.yearBuilt && (
+                        <div className="property-year">
+                          Built in {propertyData.yearBuilt}
                         </div>
-                        
-                        {propertyData.yearBuilt && (
-                          <div className="property-year">
-                            Built in {propertyData.yearBuilt}
-                          </div>
-                        )}
-                      </div>
-                      
-                      <div className="property-specs-grid">
-                        {propertyData.bedrooms && (
-                          <div className="property-spec">
-                            <span className="spec-icon">🛏️</span>
-                            <span className="spec-value">{propertyData.bedrooms}</span>
-                            <span className="spec-label">Beds</span>
-                          </div>
-                        )}
-                        
-                        {propertyData.bathrooms && (
-                          <div className="property-spec">
-                            <span className="spec-icon">🚿</span>
-                            <span className="spec-value">{propertyData.bathrooms}</span>
-                            <span className="spec-label">Baths</span>
-                          </div>
-                        )}
-                        
-                        {propertyData.squareFootage && (
-                          <div className="property-spec">
-                            <span className="spec-icon">📏</span>
-                            <span className="spec-value">{propertyData.squareFootage.toLocaleString()}</span>
-                            <span className="spec-label">Sq Ft</span>
-                          </div>
-                        )}
-                        
-                        {propertyData.lotSize && (
-                          <div className="property-spec">
-                            <span className="spec-icon">🌳</span>
-                            <span className="spec-value">{propertyData.lotSize.toLocaleString()}</span>
-                            <span className="spec-label">Lot Sq Ft</span>
-                          </div>
-                        )}
-                      </div>
-                      
-                      {propertyData.rentEstimate && (
-                        <div className="property-valuation">
+                      )}
+                    </div>
+
+                    <div className="property-specs-grid">
+                      {propertyData.bedrooms && (
+                        <div className="property-spec">
+                          <span className="spec-icon">🛏️</span>
+                          <span className="spec-value">
+                            {propertyData.bedrooms}
+                          </span>
+                          <span className="spec-label">Beds</span>
+                        </div>
+                      )}
+
+                      {propertyData.bathrooms && (
+                        <div className="property-spec">
+                          <span className="spec-icon">🚿</span>
+                          <span className="spec-value">
+                            {propertyData.bathrooms}
+                          </span>
+                          <span className="spec-label">Baths</span>
+                        </div>
+                      )}
+
+                      {propertyData.squareFootage && (
+                        <div className="property-spec">
+                          <span className="spec-icon">📏</span>
+                          <span className="spec-value">
+                            {propertyData.squareFootage?.toLocaleString()}
+                          </span>
+                          <span className="spec-label">Sq Ft</span>
+                        </div>
+                      )}
+
+                      {propertyData.lotSize && (
+                        <div className="property-spec">
+                          <span className="spec-icon">🌳</span>
+                          <span className="spec-value">
+                            {propertyData.lotSize?.toLocaleString()}
+                          </span>
+                          <span className="spec-label">Lot Sq Ft</span>
+                        </div>
+                      )}
+                    </div>
+
+                    {propertyData.rentEstimate && (
+                      <div className="property-valuation">
+                        <div className="valuation-item">
+                          <span className="valuation-label">
+                            Estimated Rent
+                          </span>
+                          <span className="valuation-value">
+                            $
+                            {propertyData.rentEstimate.rent?.toLocaleString()}/mo
+                          </span>
+                        </div>
+
+                        {propertyData.lastSalePrice && (
                           <div className="valuation-item">
-                            <span className="valuation-label">Estimated Rent</span>
-                            <span className="valuation-value">${propertyData.rentEstimate.rent.toLocaleString()}/mo</span>
+                            <span className="valuation-label">
+                              Last Sale Price
+                            </span>
+                            <span className="valuation-value">
+                              ${propertyData.lastSalePrice?.toLocaleString()}
+                            </span>
+                            {propertyData.lastSaleDate && (
+                              <span className="valuation-date">
+                                {new Date(
+                                  propertyData.lastSaleDate,
+                                ).toLocaleDateString()}
+                              </span>
+                            )}
                           </div>
-                          
-                          {propertyData.lastSalePrice && (
-                            <div className="valuation-item">
-                              <span className="valuation-label">Last Sale Price</span>
-                              <span className="valuation-value">${propertyData.lastSalePrice.toLocaleString()}</span>
-                              {propertyData.lastSaleDate && (
-                                <span className="valuation-date">{new Date(propertyData.lastSaleDate).toLocaleDateString()}</span>
-                              )}
-                            </div>
-                          )}
-                        </div>
-                      )}
-                      
-                      {/* Property Features */}
-                      {propertyData.features && Object.keys(propertyData.features).length > 0 && (
+                        )}
+                      </div>
+                    )}
+
+                    {/* Property Features */}
+                    {propertyData.features &&
+                      Object.keys(propertyData.features).length > 0 && (
                         <div className="property-features">
                           <h5>Features</h5>
                           <div className="features-list">
-                            {Object.entries(propertyData.features)
-                              .filter(([_, value]) => value !== null && value !== "")
-                              .slice(0, 6) // Limit to first 6 features
-                              .map(([key, value]) => (
-                                <div className="feature-item" key={key}>
-                                  <span className="feature-name">{key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase())}</span>
-                                  <span className="feature-value">{value}</span>
-                                </div>
-                              ))
-                            }
-                            {Object.keys(propertyData.features).length > 6 && (
-                              <div className="feature-more">+ {Object.keys(propertyData.features).length - 6} more</div>
+                            {featuresToShow?.map(([key, value]) => (
+                              <div className="feature-item" key={key}>
+                                <span className="feature-name">
+                                  {key
+                                    .replace(/([A-Z])/g, ' $1')
+                                    .replace(/^./, (str) => str.toUpperCase())}
+                                </span>
+                                <span className="feature-value">{value}</span>
+                              </div>
+                            ))}
+                            {hasMoreFeatures && !showAllFeatures && (
+                              <div
+                                className="feature-more"
+                                onClick={() => setShowAllFeatures(true)}
+                              >
+                                + {displayedFeatures.length - 6} more
+                              </div>
+                            )}
+                            {hasMoreFeatures && showAllFeatures && (
+                              <div
+                                className="feature-more"
+                                onClick={() => setShowAllFeatures(false)}
+                              >
+                                Show less
+                              </div>
                             )}
                           </div>
                         </div>
                       )}
-                    </div>
                   </div>
-                )}
-              </div>
-              
-              <div className="location-actions">
-                <button
-                  onClick={() => {
-                    if (coordinates) {
-                      window.open(`https://www.google.com/maps?q=${coordinates.latitude},${coordinates.longitude}`, '_blank');
-                    }
-                  }}
-                  className="map-button"
-                >
-                  <span className="button-icon">🗺️</span> View on Map
-                </button>
-                <button
-                  onClick={detectLocation}
-                  className="refresh-button"
-                >
-                  <span className="button-icon">🔄</span> Refresh
-                </button>
-              </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {status === 'success' && (
+            <div className="location-actions">
+              <button onClick={viewOnMap} className="map-button">
+                <span className="button-icon">🗺️</span> View on Map
+              </button>
+              <button onClick={detectLocation} className="refresh-button">
+                <span className="button-icon">🔄</span> Refresh
+              </button>
             </div>
           )}
         </div>
       )}
-      
+
       <style jsx>{`
         .home-location-section {
           background-color: white;
@@ -582,7 +662,9 @@ const HomeLocationDetector = ({ onLocationDetected }) => {
         }
 
         @keyframes spin {
-          to { transform: rotate(360deg); }
+          to {
+            transform: rotate(360deg);
+          }
         }
 
         .error-message {
@@ -700,7 +782,7 @@ const HomeLocationDetector = ({ onLocationDetected }) => {
           font-weight: 600;
           color: var(--gray-800);
         }
-        
+
         /* Property Data Styles */
         .loading-indicator {
           display: flex;
@@ -710,27 +792,27 @@ const HomeLocationDetector = ({ onLocationDetected }) => {
           background-color: var(--gray-100);
           border-radius: var(--border-radius);
         }
-        
+
         .loading-indicator .spinner {
           border-top-color: var(--primary);
         }
-        
+
         .loading-indicator span {
           margin-left: 0.5rem;
           color: var(--gray-700);
         }
-        
+
         .property-error {
           padding: 1rem;
           background-color: rgba(239, 71, 111, 0.1);
           border-radius: var(--border-radius);
           color: var(--danger);
         }
-        
+
         .property-section {
           flex: 1 1 100%;
         }
-        
+
         .property-info-container {
           background-color: var(--gray-100);
           border-radius: var(--border-radius);
@@ -739,13 +821,13 @@ const HomeLocationDetector = ({ onLocationDetected }) => {
           flex-direction: column;
           gap: 1rem;
         }
-        
+
         .property-overview {
           display: flex;
           justify-content: space-between;
           align-items: center;
         }
-        
+
         .property-type-badge {
           background-color: var(--primary);
           color: white;
@@ -754,12 +836,12 @@ const HomeLocationDetector = ({ onLocationDetected }) => {
           font-size: 0.85rem;
           font-weight: 600;
         }
-        
+
         .property-year {
           font-size: 0.9rem;
           color: var(--gray-600);
         }
-        
+
         .property-specs-grid {
           display: grid;
           grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
@@ -768,31 +850,31 @@ const HomeLocationDetector = ({ onLocationDetected }) => {
           border-radius: var(--border-radius);
           padding: 0.75rem;
         }
-        
+
         .property-spec {
           display: flex;
           flex-direction: column;
           align-items: center;
           text-align: center;
         }
-        
+
         .spec-icon {
           font-size: 1.25rem;
           margin-bottom: 0.25rem;
         }
-        
+
         .spec-value {
           font-size: 1.1rem;
           font-weight: 700;
           color: var(--gray-800);
           margin-bottom: 0.1rem;
         }
-        
+
         .spec-label {
           font-size: 0.75rem;
           color: var(--gray-600);
         }
-        
+
         .property-valuation {
           background-color: white;
           border-radius: var(--border-radius);
@@ -801,51 +883,51 @@ const HomeLocationDetector = ({ onLocationDetected }) => {
           flex-wrap: wrap;
           gap: 1rem;
         }
-        
+
         .valuation-item {
           flex: 1;
           min-width: 150px;
           display: flex;
           flex-direction: column;
         }
-        
+
         .valuation-label {
           font-size: 0.75rem;
           color: var(--gray-600);
           margin-bottom: 0.25rem;
         }
-        
+
         .valuation-value {
           font-size: 1.25rem;
           font-weight: 700;
           color: var(--primary);
           margin-bottom: 0.1rem;
         }
-        
+
         .valuation-date {
           font-size: 0.75rem;
           color: var(--gray-500);
         }
-        
+
         .property-features {
           background-color: white;
           border-radius: var(--border-radius);
           padding: 0.75rem;
         }
-        
+
         .property-features h5 {
           font-size: 0.9rem;
           color: var(--gray-700);
           margin-top: 0;
           margin-bottom: 0.75rem;
         }
-        
+
         .features-list {
           display: grid;
           grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
           gap: 0.5rem;
         }
-        
+
         .feature-item {
           display: flex;
           justify-content: space-between;
@@ -853,16 +935,16 @@ const HomeLocationDetector = ({ onLocationDetected }) => {
           padding: 0.25rem 0;
           border-bottom: 1px dotted var(--gray-300);
         }
-        
+
         .feature-name {
           color: var(--gray-600);
         }
-        
+
         .feature-value {
           color: var(--gray-800);
           font-weight: 500;
         }
-        
+
         .feature-more {
           grid-column: 1 / -1;
           text-align: center;
@@ -872,7 +954,7 @@ const HomeLocationDetector = ({ onLocationDetected }) => {
           padding: 0.5rem;
           cursor: pointer;
         }
-        
+
         .feature-more:hover {
           text-decoration: underline;
         }
@@ -882,7 +964,8 @@ const HomeLocationDetector = ({ onLocationDetected }) => {
           gap: 1rem;
         }
 
-        .map-button, .refresh-button {
+        .map-button,
+        .refresh-button {
           flex: 1;
           display: flex;
           align-items: center;
@@ -924,15 +1007,15 @@ const HomeLocationDetector = ({ onLocationDetected }) => {
           .coordinate-grid {
             grid-template-columns: 1fr;
           }
-          
+
           .location-actions {
             flex-direction: column;
           }
-          
+
           .property-specs-grid {
             grid-template-columns: repeat(2, 1fr);
           }
-          
+
           .features-list {
             grid-template-columns: 1fr;
           }
