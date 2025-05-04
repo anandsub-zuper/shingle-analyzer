@@ -1,10 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 
 const HomeLocationDetector = ({ onLocationDetected }) => {
   const [status, setStatus] = useState('idle');
   const [coordinates, setCoordinates] = useState(null);
   const [address, setAddress] = useState(null);
-  const [userEditedAddress, setUserEditedAddress] = useState(''); // State for edited address
+  const [userEditedAddress, setUserEditedAddress] = useState('');
   const [error, setError] = useState(null);
   const [expanded, setExpanded] = useState(false);
   const [propertyData, setPropertyData] = useState(null);
@@ -24,7 +24,7 @@ const HomeLocationDetector = ({ onLocationDetected }) => {
       // Step 2: Convert coordinates to address
       const addressData = await getAddressFromCoordinates(coords.latitude, coords.longitude);
       setAddress(addressData);
-      setUserEditedAddress(''); //reset
+      setUserEditedAddress(''); // Reset edited address
 
       // Call the callback with all the location data
       if (onLocationDetected) {
@@ -260,55 +260,26 @@ const HomeLocationDetector = ({ onLocationDetected }) => {
     }
   };
 
-  const displayedFeatures =
-    propertyData?.features &&
-    Object.entries(propertyData.features).filter(
-      ([_, value]) => value !== null && value !== "",
-    );
+    const handleAddressChange = (event) => {
+        setUserEditedAddress(event.target.value);
+    };
 
-  const featuresToShow = showAllFeatures
-    ? displayedFeatures
-    : displayedFeatures?.slice(0, 6);
-  const hasMoreFeatures = displayedFeatures?.length > 6;
-
-  // Function to handle map viewing with improved accuracy
-  const viewOnMap = () => {
-    if (coordinates) {
-      // Use a more precise zoom level (e.g., 18 or higher)
-      const zoom = 18;
-      const mapUrl = `https://www.google.com/maps/@${coordinates.latitude},${coordinates.longitude},${zoom}z`;
-      window.open(mapUrl, '_blank');
-    }
-  };
-
-  // Helper function to get property type with fallback
-  const getPropertyType = () => {
-    if (propertyData?.propertyType) {
-      return propertyData.propertyType;
-    }
-    return "Property"; // Default to "Unknown Type" or "Property"
-  };
-
-  const getLastSaleDate = () => {
-    if (propertyData?.lastSaleDate) {
-      try {
-        const date = new Date(propertyData.lastSaleDate);
-        return date.toLocaleDateString();  // Format the date
-      } catch (e) {
-        console.error("Error parsing lastSaleDate", e);
-        return "Invalid Date";
-      }
-    }
-    return "N/A";
-  };
-
-  const handleAddressChange = (event) => {
-    setUserEditedAddress(event.target.value);
-  };
+    // useCallback is crucial here to prevent infinite loop
+    const handleAddressUpdate = useCallback(() => {
+        if (userEditedAddress) {
+            fetchPropertyData(userEditedAddress);
+        }
+    }, [userEditedAddress]);
 
   const displayAddress = () => {
     return userEditedAddress || address?.fullAddress || `${formatCoordinate(coordinates?.latitude)}, ${formatCoordinate(coordinates?.longitude)}`;
   };
+
+  useEffect(() => {
+    if (status === 'success') {
+      setUserEditedAddress(address?.fullAddress || '');
+    }
+  }, [status, address]);
 
   return (
     <div className="home-location-section">
@@ -384,7 +355,7 @@ const HomeLocationDetector = ({ onLocationDetected }) => {
                   <div className="data-section">
                     <h4>Address</h4>
                     <div className="address-display">
-                      <p className="full-address">
+                      <div className="address-input-container">
                         <input
                           type="text"
                           value={displayAddress()}
@@ -392,7 +363,13 @@ const HomeLocationDetector = ({ onLocationDetected }) => {
                           placeholder="Enter address"
                           className="address-input"
                         />
-                      </p>
+                         <button
+                            onClick={handleAddressUpdate}
+                            className="update-button"
+                          >
+                            Update
+                        </button>
+                      </div>
                       <p className="address-disclaimer">
                         <small>
                           The displayed address may not be exact. Please use the map
@@ -841,21 +818,28 @@ const HomeLocationDetector = ({ onLocationDetected }) => {
           margin: 0 0 0.75rem 0;
           color: var(--gray-800);
           font-weight: 500;
-          display: flex; // Use flexbox for alignment
+          display: flex; /* Use flexbox for alignment */
           align-items: center;
           gap: 0.5rem;
         }
 
-        .address-input{
+        .address-input-container{
+          display: flex;
+          align-items: center;
+          gap: 0.5rem;
+          flex-wrap: wrap;
+        }
+
+        .address-input {
           flex: 1;
           padding: 0.5rem;
           border-radius: var(--border-radius);
           border: 1px solid var(--gray-300);
           font-size: 0.875rem;
-
+          min-width: 200px;
         }
 
-        .address-disclaimer{
+        .address-disclaimer {
           font-size: 0.75rem;
           color: var(--gray-500);
           margin-top: 0.25rem;
@@ -1011,7 +995,8 @@ const HomeLocationDetector = ({ onLocationDetected }) => {
 
         .property-features {
           background-color: white;
-          border-radius: var(--border-radius);padding: 0.75rem;
+          border-radius: var(--border-radius);
+          padding: 0.75rem;
         }
 
         .property-features h5 {
@@ -1187,6 +1172,22 @@ const HomeLocationDetector = ({ onLocationDetected }) => {
           margin-bottom: 0.25rem;
         }
 
+        .update-button {
+          background-color: var(--secondary);
+          color: white;
+          padding: 0.5rem 1rem;
+          border-radius: var(--border-radius);
+          font-size: 0.875rem;
+          cursor: pointer;
+          transition: all 0.2s ease;
+          white-space: nowrap;
+        }
+
+        .update-button:hover {
+          background-color: var(--secondary-dark);
+          transform: translateY(-2px);
+        }
+
         @media (max-width: 768px) {
           .coordinate-grid {
             grid-template-columns: 1fr;
@@ -1203,6 +1204,12 @@ const HomeLocationDetector = ({ onLocationDetected }) => {
           .features-list {
             grid-template-columns: 1fr;
           }
+
+          .address-input-container {
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 0.5rem;
+          }
         }
       `}</style>
     </div>
@@ -1210,4 +1217,3 @@ const HomeLocationDetector = ({ onLocationDetected }) => {
 };
 
 export default HomeLocationDetector;
-
