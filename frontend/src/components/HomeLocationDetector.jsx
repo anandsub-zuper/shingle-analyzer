@@ -4,6 +4,7 @@ const HomeLocationDetector = ({ onLocationDetected }) => {
   const [status, setStatus] = useState('idle');
   const [coordinates, setCoordinates] = useState(null);
   const [address, setAddress] = useState(null);
+  const [userEditedAddress, setUserEditedAddress] = useState(''); // State for edited address
   const [error, setError] = useState(null);
   const [expanded, setExpanded] = useState(false);
   const [propertyData, setPropertyData] = useState(null);
@@ -23,6 +24,7 @@ const HomeLocationDetector = ({ onLocationDetected }) => {
       // Step 2: Convert coordinates to address
       const addressData = await getAddressFromCoordinates(coords.latitude, coords.longitude);
       setAddress(addressData);
+      setUserEditedAddress(''); //reset
 
       // Call the callback with all the location data
       if (onLocationDetected) {
@@ -300,6 +302,14 @@ const HomeLocationDetector = ({ onLocationDetected }) => {
     return "N/A";
   };
 
+  const handleAddressChange = (event) => {
+    setUserEditedAddress(event.target.value);
+  };
+
+  const displayAddress = () => {
+    return userEditedAddress || address?.fullAddress || `${formatCoordinate(coordinates?.latitude)}, ${formatCoordinate(coordinates?.longitude)}`;
+  };
+
   return (
     <div className="home-location-section">
       <div className="location-header" onClick={() => setExpanded(!expanded)}>
@@ -310,10 +320,7 @@ const HomeLocationDetector = ({ onLocationDetected }) => {
 
         {status === 'success' && !expanded && (
           <div className="location-preview">
-            {address?.fullAddress ||
-              `${formatCoordinate(coordinates?.latitude)}, ${formatCoordinate(
-                coordinates?.longitude,
-              )}`}
+            {displayAddress()}
           </div>
         )}
       </div>
@@ -377,7 +384,21 @@ const HomeLocationDetector = ({ onLocationDetected }) => {
                   <div className="data-section">
                     <h4>Address</h4>
                     <div className="address-display">
-                      <p className="full-address">{address.fullAddress}</p>
+                      <p className="full-address">
+                        <input
+                          type="text"
+                          value={displayAddress()}
+                          onChange={handleAddressChange}
+                          placeholder="Enter address"
+                          className="address-input"
+                        />
+                      </p>
+                      <p className="address-disclaimer">
+                        <small>
+                          The displayed address may not be exact. Please use the map
+                          below to verify.
+                        </small>
+                      </p>
                       {address.components && (
                         <div className="address-components">
                           {address.components.locality && (
@@ -820,6 +841,24 @@ const HomeLocationDetector = ({ onLocationDetected }) => {
           margin: 0 0 0.75rem 0;
           color: var(--gray-800);
           font-weight: 500;
+          display: flex; // Use flexbox for alignment
+          align-items: center;
+          gap: 0.5rem;
+        }
+
+        .address-input{
+          flex: 1;
+          padding: 0.5rem;
+          border-radius: var(--border-radius);
+          border: 1px solid var(--gray-300);
+          font-size: 0.875rem;
+
+        }
+
+        .address-disclaimer{
+          font-size: 0.75rem;
+          color: var(--gray-500);
+          margin-top: 0.25rem;
         }
 
         .address-components {
@@ -972,8 +1011,7 @@ const HomeLocationDetector = ({ onLocationDetected }) => {
 
         .property-features {
           background-color: white;
-          border-radius: var(--border-radius);
-          padding: 0.75rem;
+          border-radius: var(--border-radius);padding: 0.75rem;
         }
 
         .property-features h5 {
@@ -1172,3 +1210,4 @@ const HomeLocationDetector = ({ onLocationDetected }) => {
 };
 
 export default HomeLocationDetector;
+
