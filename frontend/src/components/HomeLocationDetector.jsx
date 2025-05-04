@@ -12,6 +12,11 @@ const HomeLocationDetector = ({ onLocationDetected }) => {
   const [propertyError, setPropertyError] = useState(null);
   const [showAllFeatures, setShowAllFeatures] = useState(false);
 
+    // Helper function to format coordinates
+    const formatCoordinate = (value) => {
+        return value ? value.toFixed(6) : '0.000000';
+    };
+
   // Helper function to get property type with fallback
   const getPropertyType = () => {
     if (propertyData?.propertyType) {
@@ -189,6 +194,7 @@ const HomeLocationDetector = ({ onLocationDetected }) => {
       };
     }
   };
+
 
   // Fetch property data from RentCast API
   const fetchPropertyData = async (addressStr) => {
@@ -937,7 +943,7 @@ const HomeLocationDetector = ({ onLocationDetected }) => {
         }
 
         .property-info-container {
-          background-color: var(--gray-100);
+          background-color: white;
           border-radius: var(--border-radius);
           padding: 1rem;
           display: flex;
@@ -1078,7 +1084,7 @@ const HomeLocationDetector = ({ onLocationDetected }) => {
           cursor: pointer;
         }
 
-        .feature-more:hover {
+        .feature-more:hover{
           text-decoration: underline;
         }
 
@@ -1256,4 +1262,3 @@ const HomeLocationDetector = ({ onLocationDetected }) => {
 };
 
 export default HomeLocationDetector;
-
