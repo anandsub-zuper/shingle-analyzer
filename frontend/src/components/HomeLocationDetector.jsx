@@ -12,10 +12,10 @@ const HomeLocationDetector = ({ onLocationDetected }) => {
   const [propertyError, setPropertyError] = useState(null);
   const [showAllFeatures, setShowAllFeatures] = useState(false);
 
-  // Helper function to format coordinates
-  const formatCoordinate = (value) => {
-    return value ? value.toFixed(6) : '0.000000';
-  };
+    // Helper function to format coordinates
+    const formatCoordinate = (value) => {
+        return value ? value.toFixed(6) : '0.000000';
+    };
 
   // Helper function to get property type with fallback
   const getPropertyType = () => {
@@ -236,7 +236,7 @@ const HomeLocationDetector = ({ onLocationDetected }) => {
       const data = await response.json();
 
       // Save the property data
-      setPropertyData(data[0]);
+      setPropertyData(data[0]); // Access the first element of the array
       console.log('Property data:', data[0]);
 
       // Also fetch rent estimate if property data was found
@@ -327,41 +327,6 @@ const HomeLocationDetector = ({ onLocationDetected }) => {
     : displayedFeatures?.slice(0, 6);
   const hasMoreFeatures = displayedFeatures?.length > 6;
 
-    // Helper function to format coordinates
-    const formatCoordinate = (value) => {
-        return value ? value.toFixed(6) : '0.000000';
-    };
-
-      // Helper function to get property type with fallback
-  const getPropertyType = () => {
-    if (propertyData?.propertyType) {
-      return propertyData.propertyType;
-    }
-    return "Property"; // Default to "Unknown Type" or "Property"
-  };
-
-  const getLastSaleDate = () => {
-    if (propertyData?.lastSaleDate) {
-      try {
-        const date = new Date(propertyData.lastSaleDate);
-        return date.toLocaleDateString();  // Format the date
-      } catch (e) {
-        console.error("Error parsing lastSaleDate", e);
-        return "Invalid Date";
-      }
-    }
-    return "N/A";
-  };
-
-  // Function to handle map viewing with improved accuracy
-  const viewOnMap = () => {
-    if (coordinates) {
-      // Use a more precise zoom level (e.g., 18 or higher)
-      const zoom = 18;
-      const mapUrl = `https://www.google.com/maps/@${coordinates.latitude},${coordinates.longitude},${zoom}z`;
-      window.open(mapUrl, '_blank');
-    }
-  };
 
 
   return (
@@ -1286,4 +1251,3 @@ const HomeLocationDetector = ({ onLocationDetected }) => {
 };
 
 export default HomeLocationDetector;
-
