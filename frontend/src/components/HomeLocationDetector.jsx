@@ -12,10 +12,10 @@ const HomeLocationDetector = ({ onLocationDetected }) => {
   const [propertyError, setPropertyError] = useState(null);
   const [showAllFeatures, setShowAllFeatures] = useState(false);
 
-    // Helper function to format coordinates
-    const formatCoordinate = (value) => {
-        return value ? value.toFixed(6) : '0.000000';
-    };
+  // Helper function to format coordinates
+  const formatCoordinate = (value) => {
+    return value ? value.toFixed(6) : '0.000000';
+  };
 
   // Helper function to get property type with fallback
   const getPropertyType = () => {
@@ -68,11 +68,6 @@ const HomeLocationDetector = ({ onLocationDetected }) => {
           coordinates: coords,
           address: addressData,
         });
-      }
-
-      // If we have an address, fetch property data
-      if (addressData && addressData.fullAddress) {
-        fetchPropertyData(addressData.fullAddress);
       }
 
       setStatus('success');
@@ -217,10 +212,12 @@ const HomeLocationDetector = ({ onLocationDetected }) => {
 
       // Encode the address for URL
       const encodedAddress = encodeURIComponent(addressStr);
+       const url = `https://api.rentcast.io/v1/properties?address=${encodedAddress}`;
+      console.log("Fetching property data from:", url); // Log the URL
 
       // Make the API request
       const response = await fetch(
-        `https://api.rentcast.io/v1/properties?address=${encodedAddress}`,
+        url,
         {
           method: 'GET',
           headers: {
@@ -231,14 +228,17 @@ const HomeLocationDetector = ({ onLocationDetected }) => {
       );
 
       if (!response.ok) {
-        throw new Error(`API error: ${response.status}`);
+        const errorText = await response.text(); // Get the error message from the response
+        console.error('RentCast API error:', response.status, errorText);
+        throw new Error(`API error: ${response.status} - ${errorText}`);
       }
 
       const data = await response.json();
 
       // Save the property data
-      setPropertyData(data[0]); // Access the first element of the array
+      setPropertyData(data[0]);
       console.log('Property data:', data[0]);
+
       // Also fetch rent estimate if property data was found
       if (data[0] && data[0].id) {
         fetchRentEstimate(data[0].id, apiKey);
@@ -262,10 +262,11 @@ const HomeLocationDetector = ({ onLocationDetected }) => {
         );
         return; // Don't throw error,  just log to console.
       }
-
+      const url = `https://api.rentcast.io/v1/avm/rent/long-term?propertyId=${propertyId}`;
+      console.log("Fetching rent estimate from:", url);
       // Make the API request
       const response = await fetch(
-        `https://api.rentcast.io/v1/avm/rent/long-term?propertyId=${propertyId}`,
+        url,
         {
           method: 'GET',
           headers: {
@@ -276,7 +277,9 @@ const HomeLocationDetector = ({ onLocationDetected }) => {
       );
 
       if (!response.ok) {
-        throw new Error(`API error: ${response.status}`);
+         const errorText = await response.text();
+         console.error('RentCast API error:', response.status, errorText);
+        throw new Error(`API error: ${response.status} - ${errorText}`);
       }
 
       const data = await response.json();
@@ -324,6 +327,41 @@ const HomeLocationDetector = ({ onLocationDetected }) => {
     : displayedFeatures?.slice(0, 6);
   const hasMoreFeatures = displayedFeatures?.length > 6;
 
+    // Helper function to format coordinates
+    const formatCoordinate = (value) => {
+        return value ? value.toFixed(6) : '0.000000';
+    };
+
+      // Helper function to get property type with fallback
+  const getPropertyType = () => {
+    if (propertyData?.propertyType) {
+      return propertyData.propertyType;
+    }
+    return "Property"; // Default to "Unknown Type" or "Property"
+  };
+
+  const getLastSaleDate = () => {
+    if (propertyData?.lastSaleDate) {
+      try {
+        const date = new Date(propertyData.lastSaleDate);
+        return date.toLocaleDateString();  // Format the date
+      } catch (e) {
+        console.error("Error parsing lastSaleDate", e);
+        return "Invalid Date";
+      }
+    }
+    return "N/A";
+  };
+
+  // Function to handle map viewing with improved accuracy
+  const viewOnMap = () => {
+    if (coordinates) {
+      // Use a more precise zoom level (e.g., 18 or higher)
+      const zoom = 18;
+      const mapUrl = `https://www.google.com/maps/@${coordinates.latitude},${coordinates.longitude},${zoom}z`;
+      window.open(mapUrl, '_blank');
+    }
+  };
 
 
   return (
@@ -569,20 +607,6 @@ const HomeLocationDetector = ({ onLocationDetected }) => {
                             <span className="owner-label">Name(s): </span>
                             <span className="owner-value">
                               {propertyData.owner.names.join(', ')}
-                            </span>
-                          </div>
-                          {propertyData.owner.mailingAddress && (
-                            <div className="owner-address">
-                              <span className="owner-label">Mailing Address: </span>
-                              <span className="owner-value">
-                                {propertyData.owner.mailingAddress.formattedAddress}
-                              </span>
-                            </div>
-                          )}
-                          <div className="owner-occupied">
-                            <span className="owner-label">Owner Occupied:</span>
-                            <span className="owner-value">
-                              {propertyData.ownerOccupied ? 'Yes' : 'No'}
                             </span>
                           </div>
                         </div>
@@ -1084,7 +1108,7 @@ const HomeLocationDetector = ({ onLocationDetected }) => {
           cursor: pointer;
         }
 
-        .feature-more:hover{
+        .feature-more:hover {
           text-decoration: underline;
         }
 
@@ -1262,3 +1286,4 @@ const HomeLocationDetector = ({ onLocationDetected }) => {
 };
 
 export default HomeLocationDetector;
+
