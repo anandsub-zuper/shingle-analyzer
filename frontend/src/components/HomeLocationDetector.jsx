@@ -12,6 +12,37 @@ const HomeLocationDetector = ({ onLocationDetected }) => {
   const [propertyError, setPropertyError] = useState(null);
   const [showAllFeatures, setShowAllFeatures] = useState(false);
 
+  // Helper function to get property type with fallback
+  const getPropertyType = () => {
+    if (propertyData?.propertyType) {
+      return propertyData.propertyType;
+    }
+    return "Property"; // Default to "Unknown Type" or "Property"
+  };
+
+  const getLastSaleDate = () => {
+    if (propertyData?.lastSaleDate) {
+      try {
+        const date = new Date(propertyData.lastSaleDate);
+        return date.toLocaleDateString();  // Format the date
+      } catch (e) {
+        console.error("Error parsing lastSaleDate", e);
+        return "Invalid Date";
+      }
+    }
+    return "N/A";
+  };
+
+  // Function to handle map viewing with improved accuracy
+  const viewOnMap = () => {
+    if (coordinates) {
+      // Use a more precise zoom level (e.g., 18 or higher)
+      const zoom = 18;
+      const mapUrl = `https://www.google.com/maps/@${coordinates.latitude},${coordinates.longitude},${zoom}z`;
+      window.open(mapUrl, '_blank');
+    }
+  };
+
   const detectLocation = async () => {
     try {
       setStatus('detecting');
@@ -159,11 +190,6 @@ const HomeLocationDetector = ({ onLocationDetected }) => {
     }
   };
 
-  // Format a coordinate value
-  const formatCoordinate = (value) => {
-    return value ? value.toFixed(6) : '0.000000';
-  };
-
   // Fetch property data from RentCast API
   const fetchPropertyData = async (addressStr) => {
     if (!addressStr) return;
@@ -260,16 +286,16 @@ const HomeLocationDetector = ({ onLocationDetected }) => {
     }
   };
 
-    const handleAddressChange = (event) => {
-        setUserEditedAddress(event.target.value);
-    };
+  const handleAddressChange = (event) => {
+    setUserEditedAddress(event.target.value);
+  };
 
-    // useCallback is crucial here to prevent infinite loop
-    const handleAddressUpdate = useCallback(() => {
-        if (userEditedAddress) {
-            fetchPropertyData(userEditedAddress);
-        }
-    }, [userEditedAddress]);
+  // useCallback is crucial here to prevent infinite loop
+  const handleAddressUpdate = useCallback(() => {
+    if (userEditedAddress) {
+      fetchPropertyData(userEditedAddress);
+    }
+  }, [userEditedAddress]);
 
   const displayAddress = () => {
     return userEditedAddress || address?.fullAddress || `${formatCoordinate(coordinates?.latitude)}, ${formatCoordinate(coordinates?.longitude)}`;
@@ -280,6 +306,19 @@ const HomeLocationDetector = ({ onLocationDetected }) => {
       setUserEditedAddress(address?.fullAddress || '');
     }
   }, [status, address]);
+
+  const displayedFeatures =
+    propertyData?.features &&
+    Object.entries(propertyData.features).filter(
+      ([_, value]) => value !== null && value !== "",
+    );
+
+  const featuresToShow = showAllFeatures
+    ? displayedFeatures
+    : displayedFeatures?.slice(0, 6);
+  const hasMoreFeatures = displayedFeatures?.length > 6;
+
+
 
   return (
     <div className="home-location-section">
@@ -363,11 +402,11 @@ const HomeLocationDetector = ({ onLocationDetected }) => {
                           placeholder="Enter address"
                           className="address-input"
                         />
-                         <button
-                            onClick={handleAddressUpdate}
-                            className="update-button"
-                          >
-                            Update
+                        <button
+                          onClick={handleAddressUpdate}
+                          className="update-button"
+                        >
+                          Update
                         </button>
                       </div>
                       <p className="address-disclaimer">
@@ -823,7 +862,7 @@ const HomeLocationDetector = ({ onLocationDetected }) => {
           gap: 0.5rem;
         }
 
-        .address-input-container{
+        .address-input-container {
           display: flex;
           align-items: center;
           gap: 0.5rem;
@@ -1217,3 +1256,4 @@ const HomeLocationDetector = ({ onLocationDetected }) => {
 };
 
 export default HomeLocationDetector;
+
