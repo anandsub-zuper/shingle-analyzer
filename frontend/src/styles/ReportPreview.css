@@ -1,0 +1,428 @@
+/* src/styles/ReportPreview.css */
+
+.report-preview {
+  background-color: var(--white);
+  border-radius: var(--border-radius);
+  box-shadow: var(--card-shadow);
+  margin-bottom: 2rem;
+  overflow: hidden;
+}
+
+.preview-header {
+  padding: 1.25rem;
+  background-color: rgba(67, 97, 238, 0.05);
+  border-bottom: 1px solid var(--gray-200);
+}
+
+.preview-title {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: var(--gray-800);
+  margin-bottom: 0.25rem;
+}
+
+.preview-subtitle {
+  font-size: 0.9rem;
+  color: var(--gray-600);
+}
+
+.preview-content {
+  padding: 1.5rem;
+}
+
+.preview-section {
+  margin-bottom: 2rem;
+  padding-bottom: 1.5rem;
+  border-bottom: 1px solid var(--gray-200);
+}
+
+.preview-section:last-child {
+  margin-bottom: 0;
+  padding-bottom: 0;
+  border-bottom: none;
+}
+
+.header-preview {
+  text-align: center;
+  padding-bottom: 1.25rem;
+}
+
+.report-heading {
+  font-size: 1.75rem;
+  font-weight: 700;
+  color: var(--primary);
+  margin-bottom: 0.5rem;
+}
+
+.report-subheading {
+  font-size: 1.1rem;
+  color: var(--gray-700);
+  margin-bottom: 0.75rem;
+}
+
+.report-date {
+  font-size: 0.9rem;
+  color: var(--gray-600);
+  font-style: italic;
+}
+
+.section-title {
+  font-size: 1.2rem;
+  font-weight: 600;
+  color: var(--gray-800);
+  margin-bottom: 1.25rem;
+  position: relative;
+  padding-left: 1rem;
+}
+
+.section-title::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0.25rem;
+  width: 4px;
+  height: 1rem;
+  background-color: var(--primary);
+  border-radius: 2px;
+}
+
+.subsection-title {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--gray-700);
+  margin-bottom: 0.75rem;
+}
+
+/* Two-column layout */
+.preview-columns {
+  display: flex;
+  flex-wrap: wrap;
+  margin: 0 -1rem;
+}
+
+.preview-column {
+  flex: 1;
+  min-width: 300px;
+  padding: 0 1rem;
+  margin-bottom: 1.5rem;
+}
+
+/* Info items layout */
+.info-item {
+  margin-bottom: 0.75rem;
+  display: flex;
+  flex-direction: column;
+}
+
+.info-label {
+  font-size: 0.8rem;
+  color: var(--gray-600);
+  margin-bottom: 0.25rem;
+}
+
+.info-value {
+  font-size: 1rem;
+  font-weight: 500;
+  color: var(--gray-800);
+}
+
+/* Property image */
+.property-image {
+  margin-top: 1.5rem;
+  text-align: center;
+}
+
+.roof-image {
+  max-width: 100%;
+  max-height: 200px;
+  border-radius: var(--border-radius);
+  border: 1px solid var(--gray-300);
+}
+
+.image-caption {
+  display: block;
+  font-size: 0.8rem;
+  color: var(--gray-600);
+  margin-top: 0.5rem;
+}
+
+/* Damage assessment styles */
+.damage-overview {
+  margin-bottom: 1.5rem;
+}
+
+.condition-badge {
+  display: inline-block;
+  padding: 0.5rem 1rem;
+  border-radius: 50px;
+  font-weight: 600;
+  color: white;
+  margin-bottom: 1rem;
+}
+
+.condition-excellent {
+  background-color: #06d6a0;
+}
+
+.condition-good {
+  background-color: #8bc34a;
+}
+
+.condition-fair {
+  background-color: #ffca3a;
+}
+
+.condition-poor {
+  background-color: #ff595e;
+}
+
+.condition-critical {
+  background-color: #dc3545;
+}
+
+.severity-meter {
+  margin-top: 1rem;
+}
+
+.severity-label {
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: var(--gray-700);
+  margin-bottom: 0.5rem;
+  display: block;
+}
+
+.severity-bar-container {
+  height: 12px;
+  background-color: var(--gray-200);
+  border-radius: 6px;
+  overflow: hidden;
+  position: relative;
+}
+
+.severity-bar {
+  height: 100%;
+  transition: width 0.5s ease;
+}
+
+.severity-value {
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: white;
+}
+
+.damage-types {
+  margin-top: 1.5rem;
+  margin-bottom: 1.5rem;
+}
+
+.damage-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.damage-tag {
+  background-color: rgba(67, 97, 238, 0.1);
+  color: var(--primary);
+  padding: 0.4rem 0.75rem;
+  border-radius: 50px;
+  font-size: 0.85rem;
+  font-weight: 500;
+}
+
+.damage-description, 
+.damage-causes {
+  margin-top: 1.5rem;
+}
+
+/* Material specifications grid */
+.material-specs-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 1.25rem;
+}
+
+.spec-item {
+  display: flex;
+  flex-direction: column;
+}
+
+.spec-label {
+  font-size: 0.8rem;
+  color: var(--gray-600);
+  margin-bottom: 0.25rem;
+}
+
+.spec-value {
+  font-size: 1rem;
+  font-weight: 500;
+  color: var(--gray-800);
+}
+
+/* Cost estimation styles */
+.cost-estimate-overview {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.5rem;
+  margin-bottom: 1.5rem;
+}
+
+.cost-item {
+  flex: 1;
+  min-width: 250px;
+  padding: 1.25rem;
+  background-color: rgba(67, 97, 238, 0.05);
+  border-radius: var(--border-radius);
+  display: flex;
+  flex-direction: column;
+}
+
+.cost-label {
+  font-size: 0.9rem;
+  color: var(--gray-600);
+  margin-bottom: 0.5rem;
+}
+
+.cost-value {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--primary);
+}
+
+.cost-breakdown {
+  margin-top: 1.5rem;
+}
+
+.cost-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+
+.cost-table th,
+.cost-table td {
+  padding: 0.75rem;
+  text-align: left;
+  border-bottom: 1px solid var(--gray-200);
+}
+
+.cost-table th {
+  font-weight: 600;
+  color: var(--gray-700);
+  background-color: var(--gray-100);
+}
+
+.issue-column {
+  width: 60%;
+}
+
+.cost-column {
+  width: 40%;
+}
+
+.cost-cell {
+  font-weight: 500;
+  color: var(--primary);
+}
+
+.total-row {
+  font-weight: 700;
+  background-color: rgba(67, 97, 238, 0.05);
+}
+
+.total-row .cost-cell {
+  color: var(--primary-dark);
+}
+
+/* Recommendations styles */
+.recommendation-box {
+  padding: 1.25rem;
+  background-color: rgba(67, 97, 238, 0.05);
+  border-radius: var(--border-radius);
+  border-left: 4px solid var(--primary);
+}
+
+.recommendation-title {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: var(--primary);
+  margin-bottom: 0.75rem;
+}
+
+.recommendation-text {
+  font-size: 1rem;
+  color: var(--gray-800);
+  line-height: 1.6;
+}
+
+/* Certification section */
+.certification-section {
+  font-size: 0.85rem;
+  color: var(--gray-600);
+}
+
+.disclaimer {
+  font-style: italic;
+  margin-bottom: 1rem;
+  line-height: 1.6;
+}
+
+.report-signature {
+  font-weight: 600;
+  color: var(--gray-700);
+  margin-top: 1rem;
+  text-align: right;
+}
+
+/* Responsive adjustments */
+@media print {
+  .preview-content {
+    padding: 0;
+  }
+  
+  .preview-header {
+    display: none;
+  }
+  
+  .report-preview {
+    box-shadow: none;
+    border-radius: 0;
+  }
+}
+
+@media (max-width: 768px) {
+  .preview-columns {
+    flex-direction: column;
+  }
+  
+  .preview-column {
+    min-width: 100%;
+  }
+  
+  .material-specs-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+  
+  .cost-table {
+    font-size: 0.8rem;
+  }
+  
+  .cost-item {
+    min-width: 100%;
+  }
+}
+
+@media (max-width: 480px) {
+  .material-specs-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .report-heading {
+    font-size: 1.5rem;
+  }
+}
