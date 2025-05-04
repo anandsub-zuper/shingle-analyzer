@@ -1,0 +1,214 @@
+/* src/styles/InsuranceReportGenerator.css */
+
+.insurance-report-container {
+  max-width: 1000px;
+  margin: 0 auto;
+  padding: 2rem 1rem;
+}
+
+.report-title {
+  font-size: 1.75rem;
+  font-weight: 700;
+  color: var(--gray-900);
+  margin-bottom: 1.5rem;
+  text-align: center;
+}
+
+.insurance-report-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 3rem;
+  background-color: var(--white);
+  border-radius: var(--border-radius);
+  box-shadow: var(--card-shadow);
+}
+
+.loading-spinner {
+  width: 50px;
+  height: 50px;
+  border: 5px solid rgba(67, 97, 238, 0.1);
+  border-radius: 50%;
+  border-top-color: var(--primary);
+  animation: spin 1s infinite linear;
+  margin-bottom: 1.5rem;
+}
+
+.error-message {
+  background-color: rgba(239, 71, 111, 0.1);
+  border-radius: var(--border-radius);
+  padding: 1.25rem;
+  margin-bottom: 1.5rem;
+  color: #ef476f;
+  border-left: 4px solid #ef476f;
+}
+
+.error-message p {
+  margin-bottom: 0.75rem;
+}
+
+.error-message p:last-child {
+  margin-bottom: 0;
+}
+
+.retry-button {
+  background-color: var(--primary);
+  color: white;
+  border: none;
+  border-radius: 4px;
+  padding: 0.4rem 0.8rem;
+  font-size: 0.9rem;
+  cursor: pointer;
+  margin-left: 0.75rem;
+  transition: all 0.2s ease;
+}
+
+.retry-button:hover {
+  background-color: var(--primary-dark);
+}
+
+.report-preview-section {
+  margin-top: 2rem;
+}
+
+.report-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  margin-top: 2rem;
+  padding: 1.5rem;
+  background-color: var(--gray-50);
+  border-radius: var(--border-radius);
+  justify-content: center;
+}
+
+.back-button,
+.download-button,
+.print-button {
+  padding: 0.75rem 1.5rem;
+  border-radius: var(--border-radius);
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.back-button {
+  background-color: var(--gray-200);
+  color: var(--gray-700);
+  border: none;
+}
+
+.back-button:hover {
+  background-color: var(--gray-300);
+}
+
+.download-button {
+  background-color: var(--primary);
+  color: white;
+  border: none;
+  display: inline-flex;
+  align-items: center;
+}
+
+.download-button:hover {
+  background-color: var(--primary-dark);
+  transform: translateY(-2px);
+  box-shadow: 0 5px 15px rgba(67, 97, 238, 0.2);
+}
+
+.print-button {
+  background-color: var(--white);
+  color: var(--gray-700);
+  border: 1px solid var(--gray-300);
+}
+
+.print-button:hover {
+  background-color: var(--gray-100);
+}
+
+.email-section {
+  margin-top: 2rem;
+  width: 100%;
+  background-color: var(--white);
+  padding: 1.5rem;
+  border-radius: var(--border-radius);
+  border: 1px solid var(--gray-200);
+}
+
+.email-section h3 {
+  font-size: 1.1rem;
+  font-weight: 600;
+  margin-bottom: 1rem;
+  color: var(--gray-800);
+}
+
+.email-input-container {
+  display: flex;
+  gap: 0.75rem;
+}
+
+.email-input {
+  flex: 1;
+  padding: 0.75rem;
+  border: 1px solid var(--gray-300);
+  border-radius: var(--border-radius);
+  font-size: 0.95rem;
+}
+
+.send-email-button {
+  background-color: var(--primary);
+  color: white;
+  border: none;
+  border-radius: var(--border-radius);
+  padding: 0.75rem 1.25rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.send-email-button:hover {
+  background-color: var(--primary-dark);
+}
+
+.send-email-button:disabled {
+  background-color: var(--gray-400);
+  cursor: not-allowed;
+}
+
+.email-error {
+  color: var(--danger);
+  margin-top: 0.75rem;
+  font-size: 0.9rem;
+}
+
+.email-success {
+  color: var(--success);
+  margin-top: 0.75rem;
+  font-size: 0.9rem;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+@media (max-width: 768px) {
+  .email-input-container {
+    flex-direction: column;
+  }
+  
+  .send-email-button {
+    width: 100%;
+  }
+  
+  .report-actions {
+    flex-direction: column;
+  }
+  
+  .back-button,
+  .download-button,
+  .print-button {
+    width: 100%;
+    text-align: center;
+  }
+}
