@@ -509,6 +509,35 @@ const HomeLocationDetector = ({ onLocationDetected }) => {
                       </div>
                     )}
 
+                    {/* Owner Information */}
+                    {propertyData.owner && propertyData.owner.names && (
+                      <div className="data-section">
+                        <h4>Owner</h4>
+                        <div className="owner-info">
+                          <div className="owner-name">
+                            <span className="owner-label">Name(s): </span>
+                            <span className="owner-value">
+                              {propertyData.owner.names.join(', ')}
+                            </span>
+                          </div>
+                          {propertyData.owner.mailingAddress && (
+                            <div className="owner-address">
+                              <span className="owner-label">Mailing Address: </span>
+                              <span className="owner-value">
+                                {propertyData.owner.mailingAddress.formattedAddress}
+                              </span>
+                            </div>
+                          )}
+                          <div className="owner-occupied">
+                            <span className="owner-label">Owner Occupied:</span>
+                            <span className="owner-value">
+                              {propertyData.ownerOccupied ? 'Yes' : 'No'}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
                     {/* Property Features */}
                     {propertyData.features &&
                       Object.keys(propertyData.features).length > 0 && (
@@ -544,6 +573,39 @@ const HomeLocationDetector = ({ onLocationDetected }) => {
                           </div>
                         </div>
                       )}
+
+                    {/* Assessor and Legal */}
+                    {propertyData.assessorID && (
+                      <div className="data-section">
+                        <h4>Assessor Information</h4>
+                        <div className="assessor-info">
+                          <div className="assessor-id">
+                            <span className="assessor-label">Assessor ID: </span>
+                            <span className="assessor-value">
+                              {propertyData.assessorID}
+                            </span>
+                          </div>
+                          <div className="legal-description">
+                            <span className="legal-label">Legal Description: </span>
+                            <span className="legal-value">
+                              {propertyData.legalDescription}
+                            </span>
+                          </div>
+                          <div className="subdivision">
+                            <span className="subdivision-label">Subdivision: </span>
+                            <span className="subdivision-value">
+                              {propertyData.subdivision}
+                            </span>
+                          </div>
+                           <div className="zoning">
+                            <span className="zoning-label">Zoning: </span>
+                            <span className="zoning-value">
+                              {propertyData.zoning}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
               )}
@@ -1001,6 +1063,91 @@ const HomeLocationDetector = ({ onLocationDetected }) => {
 
         .button-icon {
           margin-right: 0.5rem;
+        }
+
+        /* Owner Styles */
+        .owner-info {
+          background-color: white;
+          border-radius: var(--border-radius);
+          padding: 0.75rem;
+        }
+
+        .owner-name {
+          font-size: 0.9rem;
+          color: var(--gray-800);
+          margin-bottom: 0.25rem;
+          display: flex;
+          flex-wrap: wrap;
+          gap: 0.5rem;
+        }
+
+        .owner-label {
+          font-weight: 600;
+          color: var(--gray-700);
+        }
+
+        .owner-value {
+          color: var(--gray-800);
+        }
+
+        .owner-address {
+          font-size: 0.875rem;
+color: var(--gray-600);
+          margin-bottom: 0.25rem;
+          display: flex;
+          flex-wrap: wrap;
+          gap: 0.5rem;
+        }
+
+        .owner-occupied {
+          font-size: 0.875rem;
+          color: var(--gray-600);
+          display: flex;
+          flex-wrap: wrap;
+          gap: 0.5rem;
+        }
+
+        /* Assessor Styles */
+        .assessor-info{
+          background-color: white;
+          border-radius: var(--border-radius);
+          padding: 0.75rem;
+        }
+
+        .assessor-id{
+          display: flex;
+          flex-wrap: wrap;
+          gap: 0.5rem;
+          font-size: 0.875rem;
+          color: var(--gray-600);
+          margin-bottom: 0.25rem;
+        }
+
+        .legal-description{
+          display: flex;
+          flex-wrap: wrap;
+          gap: 0.5rem;
+          font-size: 0.875rem;
+          color: var(--gray-600);
+          margin-bottom: 0.25rem;
+        }
+
+        .subdivision{
+          display: flex;
+          flex-wrap: wrap;
+          gap: 0.5rem;
+          font-size: 0.875rem;
+          color: var(--gray-600);
+          margin-bottom: 0.25rem;
+        }
+
+        .zoning{
+          display: flex;
+          flex-wrap: wrap;
+          gap: 0.5rem;
+          font-size: 0.875rem;
+          color: var(--gray-600);
+          margin-bottom: 0.25rem;
         }
 
         @media (max-width: 768px) {
