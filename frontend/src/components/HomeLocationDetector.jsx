@@ -203,12 +203,11 @@ const HomeLocationDetector = ({ onLocationDetected }) => {
       const data = await response.json();
 
       // Save the property data
-      setPropertyData(data);
-      console.log('Property data:', data);
-
+      setPropertyData(data[0]); // Access the first element of the array
+      console.log('Property data:', data[0]);
       // Also fetch rent estimate if property data was found
-      if (data && data.id) {
-        fetchRentEstimate(data.id, apiKey);
+      if (data[0] && data[0].id) {
+        fetchRentEstimate(data[0].id, apiKey);
       }
     } catch (error) {
       console.error('Error fetching property data:', error);
@@ -285,7 +284,20 @@ const HomeLocationDetector = ({ onLocationDetected }) => {
     if (propertyData?.propertyType) {
       return propertyData.propertyType;
     }
-    return "Property"; // Default to "Property" or you can use "Unknown Type"
+    return "Property"; // Default to "Unknown Type" or "Property"
+  };
+
+  const getLastSaleDate = () => {
+    if (propertyData?.lastSaleDate) {
+      try {
+        const date = new Date(propertyData.lastSaleDate);
+        return date.toLocaleDateString();  // Format the date
+      } catch (e) {
+        console.error("Error parsing lastSaleDate", e);
+        return "Invalid Date";
+      }
+    }
+    return "N/A";
   };
 
   return (
@@ -497,13 +509,9 @@ const HomeLocationDetector = ({ onLocationDetected }) => {
                             <span className="valuation-value">
                               ${propertyData.lastSalePrice?.toLocaleString()}
                             </span>
-                            {propertyData.lastSaleDate && (
-                              <span className="valuation-date">
-                                {new Date(
-                                  propertyData.lastSaleDate,
-                                ).toLocaleDateString()}
-                              </span>
-                            )}
+                            <span className="valuation-date">
+                              {getLastSaleDate()}
+                            </span>
                           </div>
                         )}
                       </div>
@@ -532,6 +540,39 @@ const HomeLocationDetector = ({ onLocationDetected }) => {
                             <span className="owner-label">Owner Occupied:</span>
                             <span className="owner-value">
                               {propertyData.ownerOccupied ? 'Yes' : 'No'}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Assessor and Legal */}
+                    {propertyData.assessorID && (
+                      <div className="data-section">
+                        <h4>Assessor Information</h4>
+                        <div className="assessor-info">
+                          <div className="assessor-id">
+                            <span className="assessor-label">Assessor ID: </span>
+                            <span className="assessor-value">
+                              {propertyData.assessorID}
+                            </span>
+                          </div>
+                          <div className="legal-description">
+                            <span className="legal-label">Legal Description: </span>
+                            <span className="legal-value">
+                              {propertyData.legalDescription}
+                            </span>
+                          </div>
+                          <div className="subdivision">
+                            <span className="subdivision-label">Subdivision: </span>
+                            <span className="subdivision-value">
+                              {propertyData.subdivision}
+                            </span>
+                          </div>
+                          <div className="zoning">
+                            <span className="zoning-label">Zoning: </span>
+                            <span className="zoning-value">
+                              {propertyData.zoning}
                             </span>
                           </div>
                         </div>
@@ -573,39 +614,6 @@ const HomeLocationDetector = ({ onLocationDetected }) => {
                           </div>
                         </div>
                       )}
-
-                    {/* Assessor and Legal */}
-                    {propertyData.assessorID && (
-                      <div className="data-section">
-                        <h4>Assessor Information</h4>
-                        <div className="assessor-info">
-                          <div className="assessor-id">
-                            <span className="assessor-label">Assessor ID: </span>
-                            <span className="assessor-value">
-                              {propertyData.assessorID}
-                            </span>
-                          </div>
-                          <div className="legal-description">
-                            <span className="legal-label">Legal Description: </span>
-                            <span className="legal-value">
-                              {propertyData.legalDescription}
-                            </span>
-                          </div>
-                          <div className="subdivision">
-                            <span className="subdivision-label">Subdivision: </span>
-                            <span className="subdivision-value">
-                              {propertyData.subdivision}
-                            </span>
-                          </div>
-                           <div className="zoning">
-                            <span className="zoning-label">Zoning: </span>
-                            <span className="zoning-value">
-                              {propertyData.zoning}
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-                    )}
                   </div>
                 </div>
               )}
@@ -1076,7 +1084,7 @@ const HomeLocationDetector = ({ onLocationDetected }) => {
           font-size: 0.9rem;
           color: var(--gray-800);
           margin-bottom: 0.25rem;
-          display: flex;
+display: flex;
           flex-wrap: wrap;
           gap: 0.5rem;
         }
@@ -1092,7 +1100,7 @@ const HomeLocationDetector = ({ onLocationDetected }) => {
 
         .owner-address {
           font-size: 0.875rem;
-color: var(--gray-600);
+          color: var(--gray-600);
           margin-bottom: 0.25rem;
           display: flex;
           flex-wrap: wrap;
@@ -1108,13 +1116,13 @@ color: var(--gray-600);
         }
 
         /* Assessor Styles */
-        .assessor-info{
+        .assessor-info {
           background-color: white;
           border-radius: var(--border-radius);
           padding: 0.75rem;
         }
 
-        .assessor-id{
+        .assessor-id {
           display: flex;
           flex-wrap: wrap;
           gap: 0.5rem;
@@ -1123,7 +1131,7 @@ color: var(--gray-600);
           margin-bottom: 0.25rem;
         }
 
-        .legal-description{
+        .legal-description {
           display: flex;
           flex-wrap: wrap;
           gap: 0.5rem;
@@ -1132,7 +1140,7 @@ color: var(--gray-600);
           margin-bottom: 0.25rem;
         }
 
-        .subdivision{
+        .subdivision {
           display: flex;
           flex-wrap: wrap;
           gap: 0.5rem;
@@ -1141,7 +1149,7 @@ color: var(--gray-600);
           margin-bottom: 0.25rem;
         }
 
-        .zoning{
+        .zoning {
           display: flex;
           flex-wrap: wrap;
           gap: 0.5rem;
