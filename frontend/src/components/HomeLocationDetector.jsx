@@ -12,10 +12,10 @@ const HomeLocationDetector = ({ onLocationDetected }) => {
   const [propertyError, setPropertyError] = useState(null);
   const [showAllFeatures, setShowAllFeatures] = useState(false);
 
-  // Helper function to format coordinates
-  const formatCoordinate = (value) => {
-    return value ? value.toFixed(6) : '0.000000';
-  };
+    // Helper function to format coordinates
+    const formatCoordinate = (value) => {
+        return value ? value.toFixed(6) : '0.000000';
+    };
 
   // Helper function to get property type with fallback
   const getPropertyType = () => {
@@ -68,11 +68,6 @@ const HomeLocationDetector = ({ onLocationDetected }) => {
           coordinates: coords,
           address: addressData,
         });
-      }
-
-      // If we have an address, fetch property data
-      if (addressData && addressData.fullAddress) {
-        fetchPropertyData(addressData.fullAddress);
       }
 
       setStatus('success');
@@ -254,17 +249,16 @@ const HomeLocationDetector = ({ onLocationDetected }) => {
   };
 
 
-
   const handleAddressChange = (event) => {
     setUserEditedAddress(event.target.value);
   };
 
   // useCallback is crucial here to prevent infinite loop
-    const handleAddressUpdate = useCallback(() => {
-        if (userEditedAddress) {
-            fetchPropertyData(userEditedAddress);
-        }
-    }, [userEditedAddress]);
+  const handleAddressUpdate = useCallback(() => {
+    if (userEditedAddress) {
+      fetchPropertyData(userEditedAddress);
+    }
+  }, [userEditedAddress]);
 
   const displayAddress = () => {
     return userEditedAddress || address?.fullAddress || `${formatCoordinate(coordinates?.latitude)}, ${formatCoordinate(coordinates?.longitude)}`;
@@ -287,41 +281,6 @@ const HomeLocationDetector = ({ onLocationDetected }) => {
     : displayedFeatures?.slice(0, 6);
   const hasMoreFeatures = displayedFeatures?.length > 6;
 
-    // Helper function to format coordinates
-    const formatCoordinate = (value) => {
-        return value ? value.toFixed(6) : '0.000000';
-    };
-
-      // Helper function to get property type with fallback
-  const getPropertyType = () => {
-    if (propertyData?.propertyType) {
-      return propertyData.propertyType;
-    }
-    return "Property"; // Default to "Unknown Type" or "Property"
-  };
-
-  const getLastSaleDate = () => {
-     if (propertyData?.lastSalePrice) { // Changed to use lastSalePrice
-      try {
-        const date = new Date(propertyData.lastSaleDate);
-        return date.toLocaleDateString();  // Format the date
-      } catch (e) {
-        console.error("Error parsing lastSaleDate", e);
-        return "Invalid Date";
-      }
-    }
-    return "N/A";
-  };
-
-  // Function to handle map viewing with improved accuracy
-  const viewOnMap = () => {
-    if (coordinates) {
-      // Use a more precise zoom level (e.g., 18 or higher)
-      const zoom = 18;
-      const mapUrl = `https://www.google.com/maps/@${coordinates.latitude},${coordinates.longitude},${zoom}z`;
-      window.open(mapUrl, '_blank');
-    }
-  };
 
 
   return (
