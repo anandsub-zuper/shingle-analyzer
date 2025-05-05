@@ -96,7 +96,7 @@ app.post('/api/analyze-shingle', async (req, res) => {
 You are an expert roof inspector specializing in shingle identification and damage assessment with 30 years of experience.
 
 TASK: 
-Analyze the uploaded roof image to provide a detailed professional assessment.
+Analyze the uploaded roof image to provide a detailed professional assessment. When considering local building codes and common roofing materials, prioritize those typical for the geographic coordinates provided. If specific local codes are not readily apparent from the coordinates, use your best judgment based on common regional practices.
 
 REQUIRED OUTPUT FORMAT:
 Respond with a JSON object containing these sections:
