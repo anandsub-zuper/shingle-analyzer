@@ -1,0 +1,25 @@
+app = "shingle-analyzer"  # Your Fly.io app name
+primary_region = "sea" # Choose a primary region that's geographically close to you or your users (e.g., "sea" for Seattle)
+
+[build]
+  builder = "heroku/buildpacks:18" # Or a more specific Node.js buildpack
+
+[http_service]
+  internal_port = 3001 # Your Express app listens on port 3001
+  force_https = true
+  auto_stop_machines = true
+  auto_start_machines = true
+  min_machines_running = 0
+  processes = ["app"]
+
+[[processes]]
+  type = "app"
+  cmd = "node server.js"
+
+[env]
+  PORT = "3001" # Set the port environment variable for your app
+
+# If you need persistent storage (Fly Volumes):
+# [[mounts]]
+#   source = "your_volume_name" # Replace with your volume name
+#   destination = "/data"       # Path inside the container to mount the volume
