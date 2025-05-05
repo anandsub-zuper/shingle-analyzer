@@ -12,10 +12,10 @@ const HomeLocationDetector = ({ onLocationDetected }) => {
   const [propertyError, setPropertyError] = useState(null);
   const [showAllFeatures, setShowAllFeatures] = useState(false);
 
-    // Helper function to format coordinates
-    const formatCoordinate = (value) => {
-        return value ? value.toFixed(6) : '0.000000';
-    };
+  // Helper function to format coordinates
+  const formatCoordinate = (value) => {
+    return value ? value.toFixed(6) : '0.000000';
+  };
 
   // Helper function to get property type with fallback
   const getPropertyType = () => {
@@ -26,10 +26,10 @@ const HomeLocationDetector = ({ onLocationDetected }) => {
   };
 
   const getLastSaleDate = () => {
-    if (propertyData?.lastSaleDate) {
+    if (propertyData?.lastSalePrice) { // Changed to use lastSalePrice
       try {
         const date = new Date(propertyData.lastSaleDate);
-        return date.toLocaleDateString();  // Format the date
+        return date.toLocaleDateString();
       } catch (e) {
         console.error("Error parsing lastSaleDate", e);
         return "Invalid Date";
@@ -68,6 +68,11 @@ const HomeLocationDetector = ({ onLocationDetected }) => {
           coordinates: coords,
           address: addressData,
         });
+      }
+
+      // If we have an address, fetch property data
+      if (addressData && addressData.fullAddress) {
+        fetchPropertyData(addressData.fullAddress);
       }
 
       setStatus('success');
@@ -212,7 +217,7 @@ const HomeLocationDetector = ({ onLocationDetected }) => {
 
       // Encode the address for URL
       const encodedAddress = encodeURIComponent(addressStr);
-       const url = `https://api.rentcast.io/v1/properties?address=${encodedAddress}`;
+      const url = `https://api.rentcast.io/v1/properties?address=${encodedAddress}`;
       console.log("Fetching property data from:", url); // Log the URL
 
       // Make the API request
@@ -239,10 +244,7 @@ const HomeLocationDetector = ({ onLocationDetected }) => {
       setPropertyData(data[0]); // Access the first element of the array
       console.log('Property data:', data[0]);
 
-      // Also fetch rent estimate if property data was found
-      if (data[0] && data[0].id) {
-        fetchRentEstimate(data[0].id, apiKey);
-      }
+
     } catch (error) {
       console.error('Error fetching property data:', error);
       setPropertyError(error.message);
@@ -251,60 +253,18 @@ const HomeLocationDetector = ({ onLocationDetected }) => {
     }
   };
 
-  // Fetch rent estimate from RentCast API
-  const fetchRentEstimate = async (propertyId, apiKey) => {
-    if (!propertyId) return;
 
-    try {
-      if (!apiKey) {
-        console.warn(
-          "RentCast API key is missing. Please set the REACT_APP_RENTCAST_API_KEY environment variable.",
-        );
-        return; // Don't throw error,  just log to console.
-      }
-      const url = `https://api.rentcast.io/v1/avm/rent/long-term?propertyId=${propertyId}`;
-      console.log("Fetching rent estimate from:", url);
-      // Make the API request
-      const response = await fetch(
-        url,
-        {
-          method: 'GET',
-          headers: {
-            Accept: 'application/json',
-            'X-Api-Key': apiKey,
-          },
-        },
-      );
-
-      if (!response.ok) {
-         const errorText = await response.text();
-         console.error('RentCast API error:', response.status, errorText);
-        throw new Error(`API error: ${response.status} - ${errorText}`);
-      }
-
-      const data = await response.json();
-
-      // Add rent estimate to property data
-      setPropertyData((prevData) => ({
-        ...prevData,
-        rentEstimate: data,
-      }));
-    } catch (error) {
-      console.error('Error fetching rent estimate:', error);
-      // Not setting error state here as it's a non-critical enhancement
-    }
-  };
 
   const handleAddressChange = (event) => {
     setUserEditedAddress(event.target.value);
   };
 
   // useCallback is crucial here to prevent infinite loop
-  const handleAddressUpdate = useCallback(() => {
-    if (userEditedAddress) {
-      fetchPropertyData(userEditedAddress);
-    }
-  }, [userEditedAddress]);
+    const handleAddressUpdate = useCallback(() => {
+        if (userEditedAddress) {
+            fetchPropertyData(userEditedAddress);
+        }
+    }, [userEditedAddress]);
 
   const displayAddress = () => {
     return userEditedAddress || address?.fullAddress || `${formatCoordinate(coordinates?.latitude)}, ${formatCoordinate(coordinates?.longitude)}`;
@@ -327,6 +287,41 @@ const HomeLocationDetector = ({ onLocationDetected }) => {
     : displayedFeatures?.slice(0, 6);
   const hasMoreFeatures = displayedFeatures?.length > 6;
 
+    // Helper function to format coordinates
+    const formatCoordinate = (value) => {
+        return value ? value.toFixed(6) : '0.000000';
+    };
+
+      // Helper function to get property type with fallback
+  const getPropertyType = () => {
+    if (propertyData?.propertyType) {
+      return propertyData.propertyType;
+    }
+    return "Property"; // Default to "Unknown Type" or "Property"
+  };
+
+  const getLastSaleDate = () => {
+     if (propertyData?.lastSalePrice) { // Changed to use lastSalePrice
+      try {
+        const date = new Date(propertyData.lastSaleDate);
+        return date.toLocaleDateString();  // Format the date
+      } catch (e) {
+        console.error("Error parsing lastSaleDate", e);
+        return "Invalid Date";
+      }
+    }
+    return "N/A";
+  };
+
+  // Function to handle map viewing with improved accuracy
+  const viewOnMap = () => {
+    if (coordinates) {
+      // Use a more precise zoom level (e.g., 18 or higher)
+      const zoom = 18;
+      const mapUrl = `https://www.google.com/maps/@${coordinates.latitude},${coordinates.longitude},${zoom}z`;
+      window.open(mapUrl, '_blank');
+    }
+  };
 
 
   return (
@@ -535,31 +530,19 @@ const HomeLocationDetector = ({ onLocationDetected }) => {
                       )}
                     </div>
 
-                    {propertyData.rentEstimate && (
+                    {propertyData.lastSalePrice && (
                       <div className="property-valuation">
                         <div className="valuation-item">
                           <span className="valuation-label">
-                            Estimated Rent
+                            Last Sale Price
                           </span>
                           <span className="valuation-value">
-                            $
-                            {propertyData.rentEstimate.rent?.toLocaleString()}/mo
+                            ${propertyData.lastSalePrice?.toLocaleString()}
+                          </span>
+                          <span className="valuation-date">
+                            {getLastSaleDate()}
                           </span>
                         </div>
-
-                        {propertyData.lastSalePrice && (
-                          <div className="valuation-item">
-                            <span className="valuation-label">
-                              Last Sale Price
-                            </span>
-                            <span className="valuation-value">
-                              ${propertyData.lastSalePrice?.toLocaleString()}
-                            </span>
-                            <span className="valuation-date">
-                              {getLastSaleDate()}
-                            </span>
-                          </div>
-                        )}
                       </div>
                     )}
 
@@ -1102,7 +1085,7 @@ const HomeLocationDetector = ({ onLocationDetected }) => {
         }
 
         .map-button:hover {
-          background-color: #38a169;
+          background-color: var(--primary-dark);
           transform: translateY(-2px);
         }
 
